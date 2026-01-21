@@ -1,6 +1,6 @@
 import React from 'react'
-import { Fragment, useState } from 'react';
-import { View,Text, TextInput, Button, DeviceEventEmitter } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 
 const InputWorkout = () => {
@@ -18,13 +18,11 @@ const InputWorkout = () => {
             console.log("Submitting form...");
            
             const body = { description }
-            console.log(body)
-            const response = await fetch(`${baseUrl}/workoutList`, {
+            await fetch(`${baseUrl}/workoutList`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(body)
             })
-            console.log(JSON.stringify(body))
             setDescription("");
             DeviceEventEmitter.emit('event.workoutAdded');
         }
@@ -36,17 +34,65 @@ const InputWorkout = () => {
 
 
     return (
-        <View>
-        <Text className='text-center mt-5'> 
+        <View style={styles.container}>
+        <Text style={styles.header}> 
             Pern Workout List
         </Text>
-        <View className='d-flex mt-5' >
-            <TextInput className='form-control' value={description}
-            onChangeText={text => setDescription(text)} />
-            <Button title="Add Workout" className='btn btn-success' onPress={onSubmitForm}/>
+        <View style={styles.inputGroup} >
+            <TextInput 
+                style={styles.input} 
+                value={description}
+                placeholder="Enter workout description"
+                placeholderTextColor="#999"
+                onChangeText={text => setDescription(text)} 
+            />
+            <TouchableOpacity style={styles.button} onPress={onSubmitForm}>
+                <Text style={styles.buttonText}>Add</Text>
+            </TouchableOpacity>
         </View>
         </View>
     )
 }
+
+const styles = StyleSheet.create({
+    container: {
+        backgroundColor: '#000000',
+        padding: 20,
+        width: '100%',
+    },
+    header: {
+        color: '#FFFFFF',
+        fontSize: 28,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginVertical: 20,
+    },
+    inputGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    input: {
+        flex: 1,
+        backgroundColor: '#1E1E1E',
+        color: '#FFFFFF',
+        padding: 15,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#333',
+        marginRight: 10,
+    },
+    button: {
+        backgroundColor: '#D32F2F',
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        justifyContent: 'center',
+    },
+    buttonText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    }
+});
 
 export default InputWorkout;

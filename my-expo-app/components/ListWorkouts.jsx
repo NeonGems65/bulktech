@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from "react";
-import { Text, View, Button, DeviceEventEmitter } from 'react-native';
+import { useEffect, useState } from "react";
+import { Text, View, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
 import Constants from 'expo-constants';
 
 const ListWorkout = () => {  
@@ -11,11 +11,10 @@ const ListWorkout = () => {
     const ip = debuggerHost?.split(':')[0] ?? 'localhost';
     const baseUrl = `http://${ip}:5000`;
 
-    console.log('hellosdfssdfsdfdfooo')
     //delete function
     const deleteWorkout = async (id) => {
         try{
-            const deleteTodo = await fetch(`${baseUrl}/workoutList/${id}`, {
+            await fetch(`${baseUrl}/workoutList/${id}`, {
                 method: "DELETE"
             });
 
@@ -33,7 +32,6 @@ const ListWorkout = () => {
             const response = await fetch(`${baseUrl}/workoutList`); // by default is a GET request
             const jsonData = await response.json();
             console.log(jsonData);
-            console.log("helloooo")
 
             setWorkouts(jsonData);
         }
@@ -50,31 +48,81 @@ const ListWorkout = () => {
         };
     }, []);
 
-    console.log(workouts) 
-
 
 return (
-        <Fragment>
-        <View className="table mb-5 text-center" >
-    <View>
-        <Text>Description</Text>
-        <Text>Edit</Text>
-        <Text>Delete</Text>
-    </View>
-    <View>
+    <View style={styles.container}>
+        <View style={styles.headerRow}>
+            <Text style={styles.headerText}>Description</Text>
+            <Text style={styles.headerText}>Action</Text>
+        </View>
+    <ScrollView style={styles.scrollView}>
       {workouts.map(workout => (
-        <View key={workout.workout_id} className="table-row">
+        <View key={workout.workout_id} style={styles.row}>
             
-          <Text>{workout.description}</Text>
-          <Button title="Delete" color="red"
+          <Text style={styles.rowText}>{workout.description}</Text>
+          <TouchableOpacity 
+            style={styles.deleteButton}
             onPress={() => deleteWorkout(workout.workout_id)}
-          />
+          >
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       ))}
+    </ScrollView>
     </View>
-  </View>
-        </Fragment>
     )
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#000000',
+        paddingHorizontal: 20,
+        width: '100%',
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#D32F2F',
+        marginBottom: 10,
+    },
+    headerText: {
+        color: '#D32F2F',
+        fontSize: 16,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    scrollView: {
+        marginBottom: 20,
+    },
+    row: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#1E1E1E',
+        padding: 15,
+        borderRadius: 8,
+        marginBottom: 10,
+    },
+    rowText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        flex: 1,
+    },
+    deleteButton: {
+        backgroundColor: '#D32F2F',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 5,
+        marginLeft: 10,
+    },
+    deleteButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    }
+});
 
 export default ListWorkout 
