@@ -1,14 +1,21 @@
 import { Fragment, useEffect, useState } from "react";
-import { Text, View, Button } from 'react-native';
+import { Text, View, Button, DeviceEventEmitter } from 'react-native';
+import Constants from 'expo-constants';
+
 const ListWorkout = () => {  
 
     const [workouts, setWorkouts] = useState([]);
+
+    // Dynamically determine the IP address of the computer running Expo
+    const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
+    const ip = debuggerHost?.split(':')[0] ?? 'localhost';
+    const baseUrl = `http://${ip}:5000`;
+
     console.log('hellosdfssdfsdfdfooo')
     //delete function
     const deleteWorkout = async (id) => {
         try{
-            // Replace <YOUR_IP_ADDRESS> with your machine's LAN IP (e.g., 192.168.1.5)
-            const deleteTodo = await fetch(`http://10.0.0.249:5000/workoutList/${id}`, {
+            const deleteTodo = await fetch(`${baseUrl}/workoutList/${id}`, {
                 method: "DELETE"
             });
 
@@ -23,8 +30,7 @@ const ListWorkout = () => {
     const getWorkouts = async () => {
         try{
             console.log("Initiating fetch request...");
-            // Replace <YOUR_IP_ADDRESS> with your machine's LAN IP
-            const response = await fetch("http://10.0.0.249:5000/workoutList"); // by default is a GET request
+            const response = await fetch(`${baseUrl}/workoutList`); // by default is a GET request
             const jsonData = await response.json();
             console.log(jsonData);
             console.log("helloooo")
@@ -38,6 +44,10 @@ const ListWorkout = () => {
 
     useEffect(() => {
         getWorkouts();
+        const subscription = DeviceEventEmitter.addListener('event.workoutAdded', getWorkouts);
+        return () => {
+            subscription.remove();
+        };
     }, []);
 
     console.log(workouts) 
@@ -56,9 +66,9 @@ return (
         <View key={workout.workout_id} className="table-row">
             
           <Text>{workout.description}</Text>
-          {/* <Button title="Delete" color="red"
+          <Button title="Delete" color="red"
             onPress={() => deleteWorkout(workout.workout_id)}
-          /> */}
+          />
         </View>
       ))}
     </View>
