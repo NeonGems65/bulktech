@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 
 const InputWorkout = () => {
 
-    const [description, setDescription] = useState("");
+    const [workout, setworkout] = useState("");
 
     // Dynamically determine the IP address of the computer running Expo
     const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
@@ -17,13 +17,13 @@ const InputWorkout = () => {
         try{
             console.log("Submitting form...");
            
-            const body = { description }
+            const body = { workout }
             await fetch(`${baseUrl}/workoutList`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(body)
             })
-            setDescription("");
+            setworkout("");
             DeviceEventEmitter.emit('event.workoutAdded');
         }
 
@@ -41,18 +41,18 @@ const InputWorkout = () => {
         <View style={styles.inputGroup} >
             <TextInput 
                 style={styles.input} 
-                value={description}
+                value={workout}
                 placeholder="Enter workout"
                 placeholderTextColor="#999"
-                onChangeText={text => setDescription(text)} 
+                onChangeText={text => setworkout(text)} 
             />
 
             <TextInput 
                 style={styles.smallInput} 
-                value={description}
+                value={workout}
                 placeholder="Lbs"
                 placeholderTextColor="#999"
-                onChangeText={text => setDescription(text)} 
+                onChangeText={text => setworkout(text)} 
             />
 
             

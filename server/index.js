@@ -18,9 +18,9 @@ app.use(express.json());
 app.post("/workoutList", async(req,res) =>{
     try{
 
-       const { description } = req.body;
-       const newWorkout = await pool.query("INSERT INTO workoutList (description) VALUES($1) RETURNING *", 
-        [description]
+       const { workout } = req.body;
+       const newWorkout = await pool.query("INSERT INTO workoutList (workout) VALUES($1) RETURNING *", 
+        [workout]
     );
 
     res.json(newWorkout.rows[0])
@@ -59,10 +59,10 @@ app.put('/workoutList/:id', async(req,res) =>{
 
     try{
         const {id} = req.params;
-        const { description } = req.body;
+        const { workout } = req.body;
         
-        const updateWorkout = await pool.query("UPDATE workoutList SET description = $1 WHERE workout_id = $2",
-            [description, id]);
+        const updateWorkout = await pool.query("UPDATE workoutList SET workout = $1 WHERE workout_id = $2",
+            [workout, id]);
         
         res.json("Workout was updated!");
     }
