@@ -36,16 +36,26 @@ const InputWorkout = () => {
     return (
         <View style={styles.container}>
         <Text style={styles.header}> 
-            Pern Workout List
+            Bulktech
         </Text>
         <View style={styles.inputGroup} >
             <TextInput 
                 style={styles.input} 
                 value={description}
-                placeholder="Enter workout description"
+                placeholder="Enter workout"
                 placeholderTextColor="#999"
                 onChangeText={text => setDescription(text)} 
             />
+
+            <TextInput 
+                style={styles.smallInput} 
+                value={description}
+                placeholder="Lbs"
+                placeholderTextColor="#999"
+                onChangeText={text => setDescription(text)} 
+            />
+
+            
             <TouchableOpacity style={styles.button} onPress={onSubmitForm}>
                 <Text style={styles.buttonText}>Add</Text>
             </TouchableOpacity>
@@ -57,7 +67,7 @@ const InputWorkout = () => {
 const styles = StyleSheet.create({
     container: {
         backgroundColor: '#000000',
-        padding: 20,
+        padding: 50,
         width: '100%',
     },
     header: {
@@ -70,9 +80,10 @@ const styles = StyleSheet.create({
     inputGroup: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     input: {
-        flex: 1,
+        flex: "row",
         backgroundColor: '#1E1E1E',
         color: '#FFFFFF',
         padding: 15,
@@ -80,6 +91,18 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#333',
         marginRight: 10,
+        width: '42%',
+    },
+    smallInput: {
+        flex: "row",
+        backgroundColor: '#1E1E1E',
+        color: '#FFFFFF',
+        padding: 15,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#333',
+        marginRight: 10,
+        width: "19%",
     },
     button: {
         backgroundColor: '#D32F2F',

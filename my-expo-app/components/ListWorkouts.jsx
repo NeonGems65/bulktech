@@ -52,8 +52,7 @@ const ListWorkout = () => {
 return (
     <View style={styles.container}>
         <View style={styles.headerRow}>
-            <Text style={styles.headerText}>Description</Text>
-            <Text style={styles.headerText}>Action</Text>
+            <Text style={styles.headerText}>Workout</Text>
         </View>
     <ScrollView style={styles.scrollView}>
       {workouts.map(workout => (
