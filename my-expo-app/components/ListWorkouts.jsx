@@ -14,7 +14,7 @@ const ListWorkout = () => {
     //delete function
     const deleteWorkout = async (id) => {
         try{
-            await fetch(`${baseUrl}/workoutList/${id}`, {
+            await fetch(`${baseUrl}/workoutlist/${id}`, {
                 method: "DELETE"
             });
 
@@ -58,7 +58,7 @@ return (
       {workouts.map(workout => (
         <View key={workout.workout_id} style={styles.row}>
             
-          <Text style={styles.rowText}>{workout.workout}</Text>
+          <Text style={styles.rowText}>{workout.name}</Text>
           <TouchableOpacity 
             style={styles.deleteButton}
             onPress={() => deleteWorkout(workout.workout_id)}

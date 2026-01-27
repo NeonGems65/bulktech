@@ -15,12 +15,12 @@ app.use(express.json());
 
 //create a workout
 
-app.post("/workoutList", async(req,res) =>{
+app.post("/workoutlist", async(req,res) =>{
     try{
 
-       const { workout } = req.body;
-       const newWorkout = await pool.query("INSERT INTO workoutList (workout) VALUES($1) RETURNING *", 
-        [workout]
+       const { name } = req.body;
+       const newWorkout = await pool.query("INSERT INTO workoutlist (name) VALUES($1) RETURNING *", 
+        [name]
     );
 
     res.json(newWorkout.rows[0])
@@ -31,9 +31,9 @@ app.post("/workoutList", async(req,res) =>{
 } )
 
 //get all Workouts
-app.get('/workoutList', async(req,res) =>{
+app.get('/workoutlist', async(req,res) =>{
     try{
-        const allWorkouts = await pool.query("SELECT * FROM workoutList");
+        const allWorkouts = await pool.query("SELECT * FROM workoutlist");
         res.json(allWorkouts.rows);
     }
     catch (err){
@@ -42,10 +42,10 @@ app.get('/workoutList', async(req,res) =>{
 })
 
 //get a Workout
-app.get('/workoutList/:id', async(req,res) =>{
+app.get('/workoutlist/:id', async(req,res) =>{
     try {
         const { id } = req.params;
-        const workout = await pool.query("SELECT * FROM workoutList WHERE workout_id = $1", [id]);
+        const workout = await pool.query("SELECT * FROM workoutlist WHERE workout_id = $1", [id]);
 
         res.json(workout.rows[0]);
     }
@@ -55,16 +55,16 @@ app.get('/workoutList/:id', async(req,res) =>{
 })
 
 //update a workout
-app.put('/workoutList/:id', async(req,res) =>{
+app.put('/workoutlist/:id', async(req,res) =>{
 
     try{
         const {id} = req.params;
-        const { workout } = req.body;
+        const { name } = req.body;
         
-        const updateWorkout = await pool.query("UPDATE workoutList SET workout = $1 WHERE workout_id = $2",
-            [workout, id]);
+        const updateName = await pool.query("UPDATE workoutlist SET name = $1 WHERE workout_id = $2",
+            [name, id]);
         
-        res.json("Workout was updated!");
+        res.json("Name was updated!");
     }
     catch (err){
         console.error(err.message);
@@ -72,11 +72,11 @@ app.put('/workoutList/:id', async(req,res) =>{
 })
 
 //delete a Workout
-app.delete('/workoutList/:id', async(req,res) => {
+app.delete('/workoutlist/:id', async(req,res) => {
 
     try{
         const {id} = req.params;
-        const deleteWorkout = await pool.query("DELETE FROM workoutList WHERE workout_id = $1", [id]);  
+        const deleteWorkout = await pool.query("DELETE FROM workoutlist WHERE workout_id = $1", [id]);  
         res.json("Workout was deleted!");
     }
 
