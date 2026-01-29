@@ -1,11 +1,13 @@
-import React from 'react'
+import React, { useCallback, useRef } from 'react'
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
-
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 const InputWorkout = () => {
 
     const [name, setName] = useState("");
+    
 
     // Dynamically determine the IP address of the computer running Expo
     const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
@@ -32,6 +34,14 @@ const InputWorkout = () => {
         }
     }
 
+    // ref
+  const bottomSheetRef = useRef(null);
+
+  // callbacks
+  const handleSheetChanges = useCallback((index) => {
+    console.log('handleSheetChanges', index);
+  }, []);
+
 
     return (
         <View style={styles.container}>
@@ -47,13 +57,27 @@ const InputWorkout = () => {
                 onChangeText={text => setName(text)} 
             />
 
-            <TextInput 
+            <View style={{width: "100%", justifyContent: "center", alignItems: "center"}}>
+                <TextInput 
                 style={styles.smallInput} 
                 value={name}
                 placeholder="Lbs"
                 placeholderTextColor="#999"
                 onChangeText={text => setName(text)} 
             />
+
+            <GestureHandlerRootView style={bottomSheetStyles.container}>
+                <BottomSheet
+                    ref={bottomSheetRef}
+                    onChange={handleSheetChanges}
+                >
+                    <BottomSheetView style={bottomSheetStyles.contentContainer}>
+                    <Text>Awesome 🎉</Text>
+                    </BottomSheetView>
+                </BottomSheet>
+            </GestureHandlerRootView>
+            
+                </View>
 
             
             <TouchableOpacity style={styles.button} onPress={onSubmitForm}>
@@ -63,6 +87,8 @@ const InputWorkout = () => {
         </View>
     )
 }
+
+
 
 const styles = StyleSheet.create({
     container: {
@@ -78,9 +104,10 @@ const styles = StyleSheet.create({
         marginVertical: 20,
     },
     inputGroup: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 15,
     },
     input: {
         flex: "row",
@@ -91,7 +118,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#333',
         marginRight: 10,
-        width: '42%',
+        width: '50%',
     },
     smallInput: {
         flex: "row",
@@ -101,8 +128,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         borderWidth: 1,
         borderColor: '#333',
-        marginRight: 10,
-        width: "19%",
+        width: "25%",
     },
     button: {
         backgroundColor: '#D32F2F',
@@ -110,12 +136,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 8,
         justifyContent: 'center',
+        width: '25%',
     },
     buttonText: {
         color: '#FFFFFF',
         fontWeight: 'bold',
         textTransform: 'uppercase',
     }
+});
+
+const bottomSheetStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'grey',
+  },
+  contentContainer: {
+    flex: 1,
+    padding: 36,
+    alignItems: 'center',
+  },
 });
 
 export default InputWorkout;
