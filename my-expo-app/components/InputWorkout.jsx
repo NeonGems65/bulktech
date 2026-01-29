@@ -3,11 +3,20 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
 import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 const InputWorkout = () => {
 
     const [name, setName] = useState("");
     const [workouts, setWorkouts] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('Chest');
+
+    const categories = {
+        Chest: ['Bench Press', 'Incline Press', 'Chest Fly', 'Push Ups'],
+        Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown'],
+        Arms: ['Bicep Curls', 'Tricep Extensions', 'Hammer Curls', 'Dips'],
+        Legs: ['Squats', 'Leg Press', 'Lunges', 'Calf Raises'],
+        Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
+    };
     
 
     // Dynamically determine the IP address of the computer running Expo
@@ -74,7 +83,7 @@ const InputWorkout = () => {
   const bottomSheetRef = useRef(null);
 
   // variables
-  const snapPoints = useMemo(() => ['80%'], []);
+  const snapPoints = useMemo(() => ['90%'], []);
 
   // callbacks
   const handleSheetChanges = useCallback((index) => {
@@ -146,7 +155,40 @@ const InputWorkout = () => {
             onChange={handleSheetChanges}
         >
             <BottomSheetView style={bottomSheetStyles.contentContainer}>
-            <Text>Select Workout</Text>
+                <View style={bottomSheetStyles.categoriesWrapper}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={bottomSheetStyles.categoriesContainer}>
+                        {Object.keys(categories).map((cat) => (
+                            <TouchableOpacity 
+                                key={cat} 
+                                style={[
+                                    bottomSheetStyles.categoryTab, 
+                                    selectedCategory === cat && bottomSheetStyles.categoryTabSelected
+                                ]}
+                                onPress={() => setSelectedCategory(cat)}
+                            >
+                                <Text style={[
+                                    bottomSheetStyles.categoryText,
+                                    selectedCategory === cat && bottomSheetStyles.categoryTextSelected
+                                ]}>{cat}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+                <BottomSheetScrollView style={bottomSheetStyles.listContainer}>
+                    {categories[selectedCategory].map((workout, index) => (
+                        <TouchableOpacity 
+                            key={index} 
+                            style={[
+                                bottomSheetStyles.workoutItem,
+                                name === workout && { backgroundColor: '#E0E0E0' }
+                            ]} 
+                            onPress={() => { setName(workout);}}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={bottomSheetStyles.workoutItemText}>{workout}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </BottomSheetScrollView>
             </BottomSheetView>
         </BottomSheet>
         </GestureHandlerRootView>
@@ -268,7 +310,49 @@ const bottomSheetStyles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: 36,
-    alignItems: 'center',
+  },
+  categoriesWrapper: {
+      marginBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: '#ccc',
+      paddingBottom: 10,
+  },
+  categoriesContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+  },
+  categoryTab: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      marginRight: 10,
+      borderRadius: 20,
+      backgroundColor: '#f0f0f0',
+  },
+  categoryTabSelected: {
+      backgroundColor: '#D32F2F',
+  },
+  categoryText: {
+      fontSize: 16,
+      color: '#333',
+      fontWeight: '600',
+  },
+  categoryTextSelected: {
+      color: '#FFFFFF',
+  },
+  listContainer: {
+      flex: 1,
+  },
+  workoutItem: {
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee',
+      width: '100%',
+      borderRadius: 20,
+      alignItems: 'center',
+  },
+  workoutItemText: {
+      fontSize: 18,
+      color: '#333',
   },
 });
 
