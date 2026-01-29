@@ -15,7 +15,6 @@ export const ScreenContent = ({ title, path, children }: ScreenContentProps) => 
   return (
     <View className={styles.container}>
       <InputWorkout/>
-            <ListWorkout/>
       
     </View>
   );
