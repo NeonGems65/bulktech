@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback, useRef, useMemo } from 'react'
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
@@ -37,14 +37,16 @@ const InputWorkout = () => {
     // ref
   const bottomSheetRef = useRef(null);
 
+  // variables
+  const snapPoints = useMemo(() => ['25%', '50%'], []);
+
   // callbacks
   const handleSheetChanges = useCallback((index) => {
     console.log('handleSheetChanges', index);
   }, []);
 
-
     return (
-        <View style={styles.container}>
+        <GestureHandlerRootView style={styles.container}>
         <Text style={styles.header}> 
             Bulktech
         </Text>
@@ -66,25 +68,29 @@ const InputWorkout = () => {
                 onChangeText={text => setName(text)} 
             />
 
-            <GestureHandlerRootView style={bottomSheetStyles.container}>
-                <BottomSheet
-                    ref={bottomSheetRef}
-                    onChange={handleSheetChanges}
-                >
-                    <BottomSheetView style={bottomSheetStyles.contentContainer}>
-                    <Text>Awesome 🎉</Text>
-                    </BottomSheetView>
-                </BottomSheet>
-            </GestureHandlerRootView>
-            
-                </View>
+            </View>
 
             
             <TouchableOpacity style={styles.button} onPress={onSubmitForm}>
                 <Text style={styles.buttonText}>Add</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.button, { marginTop: 10, backgroundColor: '#555' }]} onPress={() => bottomSheetRef.current?.expand()}>
+                <Text style={styles.buttonText}>Open</Text>
+            </TouchableOpacity>
         </View>
-        </View>
+        <BottomSheet
+            ref={bottomSheetRef}
+            index={-1}
+            snapPoints={snapPoints}
+            enablePanDownToClose={true}
+            onChange={handleSheetChanges}
+        >
+            <BottomSheetView style={bottomSheetStyles.contentContainer}>
+            <Text>Awesome 🎉</Text>
+            </BottomSheetView>
+        </BottomSheet>
+        </GestureHandlerRootView>
     )
 }
 
@@ -92,6 +98,7 @@ const InputWorkout = () => {
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
         backgroundColor: '#000000',
         padding: 50,
         width: '100%',
