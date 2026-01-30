@@ -9,6 +9,7 @@ const InputWorkout = () => {
     const [name, setName] = useState("");
     const [workouts, setWorkouts] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('Chest');
+    const [selectedWeight, setSelectedWeight] = useState(null);
 
     const categories = {
         Chest: ['Bench Press', 'Incline Press', 'Chest Fly', 'Push Ups'],
@@ -18,6 +19,21 @@ const InputWorkout = () => {
         Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
     };
     
+    const kilosWeights = useMemo(() => {
+        const weights = [];
+        for (let i = 2.5; i <= 97.5; i += 5) {
+            weights.push(i);
+        }
+        return weights;
+    }, []);
+
+    const lbsWeights = useMemo(() => {
+        const weights = [];
+        for (let i = 10; i <= 200; i += 10) {
+            weights.push(i);
+        }
+        return weights;
+    }, []);
 
     // Dynamically determine the IP address of the computer running Expo
     const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
@@ -119,11 +135,6 @@ const InputWorkout = () => {
                 <Text style={styles.buttonText}>Select Workout</Text>
             </TouchableOpacity>
 
-            
-            <TouchableOpacity style={styles.button} onPress={onSubmitForm}>
-                <Text style={styles.buttonText}>Add</Text>
-            </TouchableOpacity>
-
            
         </View>
 
@@ -189,6 +200,49 @@ const InputWorkout = () => {
                         </TouchableOpacity>
                     ))}
                 </BottomSheetScrollView>
+                {name ? (
+                    <>
+                        <View style={bottomSheetStyles.weightSection}>
+                        <View style={bottomSheetStyles.weightColumn}>
+                            <Text style={bottomSheetStyles.weightHeader}>Kilos</Text>
+                            <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                {kilosWeights.map((w) => (
+                                    <TouchableOpacity 
+                                        key={w} 
+                                        style={[
+                                            bottomSheetStyles.weightItem,
+                                            selectedWeight === `k-${w}` && { backgroundColor: '#E0E0E0' }
+                                        ]}
+                                        onPress={() => setSelectedWeight(`k-${w}`)}
+                                    >
+                                        <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                        <View style={bottomSheetStyles.weightColumn}>
+                            <Text style={bottomSheetStyles.weightHeader}>Lbs</Text>
+                            <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                {lbsWeights.map((w) => (
+                                    <TouchableOpacity 
+                                        key={w} 
+                                        style={[
+                                            bottomSheetStyles.weightItem,
+                                            selectedWeight === `l-${w}` && { backgroundColor: '#E0E0E0' }
+                                        ]}
+                                        onPress={() => setSelectedWeight(`l-${w}`)}
+                                    >
+                                        <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                        </View>
+                        <TouchableOpacity style={bottomSheetStyles.addButton} onPress={onSubmitForm}>
+                            <Text style={bottomSheetStyles.addButtonText}>Add</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : null}
             </BottomSheetView>
         </BottomSheet>
         </GestureHandlerRootView>
@@ -353,6 +407,50 @@ const bottomSheetStyles = StyleSheet.create({
   workoutItemText: {
       fontSize: 18,
       color: '#333',
+  },
+  weightSection: {
+      flexDirection: 'row',
+      height: 200,
+      borderTopWidth: 1,
+      borderTopColor: '#ccc',
+      marginTop: 10,
+      paddingTop: 10,
+  },
+  weightColumn: {
+      flex: 1,
+      alignItems: 'center',
+  },
+  weightHeader: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 10,
+      color: '#333',
+  },
+  weightList: {
+      width: '100%',
+  },
+  weightItem: {
+      paddingVertical: 10,
+      alignItems: 'center',
+      width: '100%',
+      borderRadius: 5,
+  },
+  weightText: {
+      fontSize: 16,
+      color: '#333',
+  },
+  addButton: {
+      backgroundColor: '#D32F2F',
+      padding: 15,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: 20,
+  },
+  addButtonText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 16,
+      textTransform: 'uppercase',
   },
 });
 
