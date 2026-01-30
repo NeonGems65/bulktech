@@ -79,7 +79,12 @@ const InputWorkout = () => {
         try{
             console.log("Submsdfdsfitting form...");
            
-            const body = { name }
+            // format selected weight into readable string (e.g. "10 kg" or "20 lbs")
+            const formattedWeight = selectedWeight
+                ? (selectedWeight.startsWith('k-') ? `${selectedWeight.split('-')[1]} kg` : `${selectedWeight.split('-')[1]} lbs`)
+                : null;
+
+            const body = { name, weight: formattedWeight }
             await fetch(`${baseUrl}/workoutlist`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -87,6 +92,10 @@ const InputWorkout = () => {
             })
             setName("");
             DeviceEventEmitter.emit('event.workoutAdded');
+            // Close the bottom sheet after successful submission
+            bottomSheetRef.current?.close();
+            // clear selected weight
+            setSelectedWeight(null);
             getWorkouts();
         }
 
@@ -146,7 +155,10 @@ const InputWorkout = () => {
             {workouts.map(workout => (
                 <View key={workout.workout_id} style={styles.row}>
                     
-                <Text style={styles.rowText}>{workout.name}</Text>
+                <View style={styles.workoutInfo}>
+                    <Text style={styles.rowText}>{workout.name}</Text>
+                    {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
+                </View>
                 <TouchableOpacity 
                     style={styles.deleteButton}
                     onPress={() => deleteWorkout(workout.workout_id)}
@@ -337,10 +349,18 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 10,
     },
+    workoutInfo: {
+        flex: 1,
+        justifyContent: 'center',
+    },
     rowText: {
         color: '#FFFFFF',
         fontSize: 16,
-        flex: 1,
+        fontWeight: 'bold',
+    },
+    weightText: {
+        color: '#CCCCCC',
+        fontSize: 14,
     },
     deleteButton: {
         backgroundColor: '#D32F2F',

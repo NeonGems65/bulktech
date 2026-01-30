@@ -18,12 +18,13 @@ app.use(express.json());
 app.post("/workoutlist", async(req,res) =>{
     try{
 
-       const { name } = req.body;
-       const newWorkout = await pool.query("INSERT INTO workoutlist (name) VALUES($1) RETURNING *", 
-        [name]
-    );
+       const { name, weight } = req.body;
+       const newWorkout = await pool.query(
+         "INSERT INTO workoutlist (name, weight) VALUES($1, $2) RETURNING *",
+         [name, weight]
+       );
 
-    res.json(newWorkout.rows[0])
+      res.json(newWorkout.rows[0]);
 
     } catch(err) {
         console.error(err.message);
