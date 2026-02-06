@@ -6,6 +6,26 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 const InputWorkout = () => {
 
+    const formatDateTime = (dateValue) => {
+        if (!dateValue) return "";
+
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return "";
+
+        // Prefer Intl when available for consistent formatting
+        try {
+            return new Intl.DateTimeFormat(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            }).format(date);
+        } catch {
+            return date.toLocaleString();
+        }
+    };
+
     const [name, setName] = useState("");
     const [workouts, setWorkouts] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('Chest');
@@ -158,6 +178,9 @@ const InputWorkout = () => {
                 <View style={styles.workoutInfo}>
                     <Text style={styles.rowText}>{workout.name}</Text>
                     {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
+                    {workout.created_at ? (
+                        <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
+                    ) : null}
                 </View>
                 <TouchableOpacity 
                     style={styles.deleteButton}
@@ -226,6 +249,7 @@ const InputWorkout = () => {
                                             selectedWeight === `k-${w}` && { backgroundColor: '#E0E0E0' }
                                         ]}
                                         onPress={() => setSelectedWeight(`k-${w}`)}
+                                        
                                     >
                                         <Text style={bottomSheetStyles.weightText}>{w}</Text>
                                     </TouchableOpacity>
@@ -362,6 +386,11 @@ const styles = StyleSheet.create({
         color: '#CCCCCC',
         fontSize: 14,
     },
+    dateText: {
+        color: '#999999',
+        fontSize: 12,
+        marginTop: 2,
+    },
     deleteButton: {
         backgroundColor: '#D32F2F',
         paddingVertical: 8,
@@ -435,6 +464,7 @@ const bottomSheetStyles = StyleSheet.create({
       borderTopColor: '#ccc',
       marginTop: 10,
       paddingTop: 10,
+      gap: 20
   },
   weightColumn: {
       flex: 1,
@@ -448,6 +478,9 @@ const bottomSheetStyles = StyleSheet.create({
   },
   weightList: {
       width: '100%',
+      borderColor: '#ed3e3e',
+      borderWidth: 2,
+      borderRadius: 5,
   },
   weightItem: {
       paddingVertical: 10,

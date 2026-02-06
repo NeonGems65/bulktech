@@ -35,7 +35,9 @@ app.post("/workoutlist", async(req,res) =>{
 //get all Workouts
 app.get('/workoutlist', async(req,res) =>{
     try{
-        const allWorkouts = await pool.query("SELECT * FROM workoutlist");
+        const allWorkouts = await pool.query(
+          "SELECT * FROM workoutlist ORDER BY created_at DESC NULLS LAST, workout_id DESC"
+        );
         res.json(allWorkouts.rows);
     }
     catch (err){
