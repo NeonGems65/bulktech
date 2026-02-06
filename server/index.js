@@ -19,6 +19,7 @@ app.post("/workoutlist", async(req,res) =>{
     try{
 
        const { name, weight } = req.body;
+       console.log("Adding workout:", name, weight);
        const newWorkout = await pool.query(
          "INSERT INTO workoutlist (name, weight) VALUES($1, $2) RETURNING *",
          [name, weight]
@@ -60,12 +61,12 @@ app.put('/workoutlist/:id', async(req,res) =>{
 
     try{
         const {id} = req.params;
-        const { name } = req.body;
+        const { name, weight } = req.body;
         
-        const updateName = await pool.query("UPDATE workoutlist SET name = $1 WHERE workout_id = $2",
-            [name, id]);
+        const updateWorkout = await pool.query("UPDATE workoutlist SET name = $1, weight = $2 WHERE workout_id = $3",
+            [name, weight, id]);
         
-        res.json("Name was updated!");
+        res.json("Workout was updated!");
     }
     catch (err){
         console.error(err.message);

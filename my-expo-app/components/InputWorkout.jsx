@@ -77,7 +77,7 @@ const InputWorkout = () => {
     const onSubmitForm = async () => {
 
         try{
-            console.log("Submsdfdsfitting form...");
+            console.log("Submitting form...");
            
             // format selected weight into readable string (e.g. "10 kg" or "20 lbs")
             const formattedWeight = selectedWeight
