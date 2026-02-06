@@ -31,6 +31,11 @@ const InputWorkout = () => {
     const [selectedCategory, setSelectedCategory] = useState('Chest');
     const [selectedWeight, setSelectedWeight] = useState(null);
 
+    const [editingWorkout, setEditingWorkout] = useState(null);
+    const [editName, setEditName] = useState("");
+    const [editSelectedCategory, setEditSelectedCategory] = useState('Chest');
+    const [editSelectedWeight, setEditSelectedWeight] = useState(null);
+
     const categories = {
         Chest: ['Bench Press', 'Incline Press', 'Chest Fly', 'Push Ups'],
         Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown'],
@@ -60,6 +65,39 @@ const InputWorkout = () => {
     const ip = debuggerHost?.split(':')[0] ?? 'localhost';
     const baseUrl = `http://${ip}:5000`;
 
+    const formatSelectedWeight = (weightSelection) => {
+        if (!weightSelection) return null;
+        if (weightSelection.startsWith('k-')) return `${weightSelection.split('-')[1]} kg`;
+        if (weightSelection.startsWith('l-')) return `${weightSelection.split('-')[1]} lbs`;
+        return null;
+    }
+
+    const parseWeightToSelection = (weightString) => {
+        if (!weightString || typeof weightString !== 'string') return null;
+
+        const trimmed = weightString.trim().toLowerCase();
+        const match = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|kgs|lb|lbs)$/);
+        if (!match) return null;
+
+        const value = match[1];
+        const unit = match[2];
+
+        if (unit.startsWith('kg')) return `k-${value}`;
+        return `l-${value}`;
+    }
+
+    const findCategoryForWorkoutName = (workoutName) => {
+        if (!workoutName) return 'Chest';
+
+        for (const category of Object.keys(categories)) {
+            if (categories[category]?.includes(workoutName)) {
+                return category;
+            }
+        }
+
+        return 'Chest';
+    }
+
     //delete function
     const deleteWorkout = async (id) => {
         try{
@@ -73,6 +111,38 @@ const InputWorkout = () => {
         catch(err) {
             console.error(err.message);
         }
+    }
+
+    const updateWorkout = async () => {
+        if (!editingWorkout) return;
+
+        try {
+            const formattedWeight = formatSelectedWeight(editSelectedWeight);
+            const body = { name: editName, weight: formattedWeight };
+
+            await fetch(`${baseUrl}/workoutlist/${editingWorkout.workout_id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+
+            setEditingWorkout(null);
+            setEditName("");
+            setEditSelectedWeight(null);
+            setEditSelectedCategory('Chest');
+            editBottomSheetRef.current?.close();
+            getWorkouts();
+        } catch (err) {
+            console.error(err.message);
+        }
+    }
+
+    const openEditSheet = (workout) => {
+        setEditingWorkout(workout);
+        setEditName(workout?.name ?? "");
+        setEditSelectedCategory(findCategoryForWorkoutName(workout?.name));
+        setEditSelectedWeight(parseWeightToSelection(workout?.weight));
+        editBottomSheetRef.current?.expand();
     }
 
     // get function
@@ -100,9 +170,7 @@ const InputWorkout = () => {
             console.log("Submitting form...");
            
             // format selected weight into readable string (e.g. "10 kg" or "20 lbs")
-            const formattedWeight = selectedWeight
-                ? (selectedWeight.startsWith('k-') ? `${selectedWeight.split('-')[1]} kg` : `${selectedWeight.split('-')[1]} lbs`)
-                : null;
+            const formattedWeight = formatSelectedWeight(selectedWeight);
 
             const body = { name, weight: formattedWeight }
             await fetch(`${baseUrl}/workoutlist`, {
@@ -126,6 +194,7 @@ const InputWorkout = () => {
 
     // ref
   const bottomSheetRef = useRef(null);
+    const editBottomSheetRef = useRef(null);
 
   // variables
   const snapPoints = useMemo(() => ['90%'], []);
@@ -182,12 +251,22 @@ const InputWorkout = () => {
                         <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
                     ) : null}
                 </View>
-                <TouchableOpacity 
-                    style={styles.deleteButton}
-                    onPress={() => deleteWorkout(workout.workout_id)}
-                >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
+
+                <View style={styles.rowActions}>
+                    <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => openEditSheet(workout)}
+                    >
+                        <Text style={styles.editButtonText}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.deleteButton}
+                        onPress={() => deleteWorkout(workout.workout_id)}
+                    >
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                </View>
                 </View>
             ))}
             </ScrollView>
@@ -276,6 +355,99 @@ const InputWorkout = () => {
                         </View>
                         <TouchableOpacity style={bottomSheetStyles.addButton} onPress={onSubmitForm}>
                             <Text style={bottomSheetStyles.addButtonText}>Add</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : null}
+            </BottomSheetView>
+        </BottomSheet>
+
+        <BottomSheet
+            ref={editBottomSheetRef}
+            index={-1}
+            snapPoints={snapPoints}
+            enablePanDownToClose={true}
+        >
+            <BottomSheetView style={bottomSheetStyles.contentContainer}>
+                <Text style={bottomSheetStyles.sheetTitle}>Edit Workout</Text>
+
+                <View style={bottomSheetStyles.categoriesWrapper}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={bottomSheetStyles.categoriesContainer}>
+                        {Object.keys(categories).map((cat) => (
+                            <TouchableOpacity 
+                                key={cat} 
+                                style={[
+                                    bottomSheetStyles.categoryTab, 
+                                    editSelectedCategory === cat && bottomSheetStyles.categoryTabSelected
+                                ]}
+                                onPress={() => setEditSelectedCategory(cat)}
+                            >
+                                <Text style={[
+                                    bottomSheetStyles.categoryText,
+                                    editSelectedCategory === cat && bottomSheetStyles.categoryTextSelected
+                                ]}>{cat}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <BottomSheetScrollView style={bottomSheetStyles.listContainer}>
+                    {categories[editSelectedCategory].map((workout, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                bottomSheetStyles.workoutItem,
+                                editName === workout && { backgroundColor: '#E0E0E0' }
+                            ]}
+                            onPress={() => { setEditName(workout); }}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={bottomSheetStyles.workoutItemText}>{workout}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </BottomSheetScrollView>
+
+                {editName ? (
+                    <>
+                        <View style={bottomSheetStyles.weightSection}>
+                            <View style={bottomSheetStyles.weightColumn}>
+                                <Text style={bottomSheetStyles.weightHeader}>Kilos</Text>
+                                <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                    {kilosWeights.map((w) => (
+                                        <TouchableOpacity
+                                            key={w}
+                                            style={[
+                                                bottomSheetStyles.weightItem,
+                                                editSelectedWeight === `k-${w}` && { backgroundColor: '#E0E0E0' }
+                                            ]}
+                                            onPress={() => setEditSelectedWeight(`k-${w}`)}
+                                        >
+                                            <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                            <View style={bottomSheetStyles.weightColumn}>
+                                <Text style={bottomSheetStyles.weightHeader}>Lbs</Text>
+                                <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                    {lbsWeights.map((w) => (
+                                        <TouchableOpacity
+                                            key={w}
+                                            style={[
+                                                bottomSheetStyles.weightItem,
+                                                editSelectedWeight === `l-${w}` && { backgroundColor: '#E0E0E0' }
+                                            ]}
+                                            onPress={() => setEditSelectedWeight(`l-${w}`)}
+                                        >
+                                            <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={bottomSheetStyles.addButton} onPress={updateWorkout}>
+                            <Text style={bottomSheetStyles.addButtonText}>Save</Text>
                         </TouchableOpacity>
                     </>
                 ) : null}
@@ -391,12 +563,28 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 2,
     },
+    rowActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginLeft: 10,
+    },
+    editButton: {
+        backgroundColor: '#555555',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 5,
+    },
+    editButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     deleteButton: {
         backgroundColor: '#D32F2F',
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 5,
-        marginLeft: 10,
     },
     deleteButtonText: {
         color: '#FFFFFF',
@@ -414,6 +602,12 @@ const bottomSheetStyles = StyleSheet.create({
     flex: 1,
     padding: 36,
   },
+    sheetTitle: {
+            fontSize: 20,
+            fontWeight: 'bold',
+            marginBottom: 12,
+            color: '#333',
+    },
   categoriesWrapper: {
       marginBottom: 20,
       borderBottomWidth: 1,
