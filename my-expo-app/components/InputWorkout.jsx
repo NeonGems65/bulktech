@@ -4,6 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet
 import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BodyMapPicker from './BodyMapPicker';
 const InputWorkout = () => {
 
     const formatDateTime = (dateValue) => {
@@ -311,27 +312,21 @@ const InputWorkout = () => {
             enablePanDownToClose={true}
             onChange={handleSheetChanges}
         >
-            <BottomSheetView style={bottomSheetStyles.contentContainer}>
-                <View style={bottomSheetStyles.categoriesWrapper}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={bottomSheetStyles.categoriesContainer}>
-                        {Object.keys(categories).map((cat) => (
-                            <TouchableOpacity 
-                                key={cat} 
-                                style={[
-                                    bottomSheetStyles.categoryTab, 
-                                    selectedCategory === cat && bottomSheetStyles.categoryTabSelected
-                                ]}
-                                onPress={() => setSelectedCategory(cat)}
-                            >
-                                <Text style={[
-                                    bottomSheetStyles.categoryText,
-                                    selectedCategory === cat && bottomSheetStyles.categoryTextSelected
-                                ]}>{cat}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-                <BottomSheetScrollView style={bottomSheetStyles.listContainer}>
+            <BottomSheetScrollView
+                contentContainerStyle={bottomSheetStyles.sheetScrollContent}
+                keyboardShouldPersistTaps="handled"
+            >
+                <BodyMapPicker
+                    selectedArea={selectedCategory}
+                    onSelectArea={(area) => {
+                        setSelectedCategory(area);
+                        setName("");
+                        setSelectedWeight(null);
+                    }}
+                />
+
+                <Text style={bottomSheetStyles.selectedAreaLabel}>{selectedCategory} exercises</Text>
+                <View style={bottomSheetStyles.exerciseList}>
                     {categories[selectedCategory].map((workout, index) => (
                         <TouchableOpacity 
                             key={index} 
@@ -345,7 +340,7 @@ const InputWorkout = () => {
                             <Text style={bottomSheetStyles.workoutItemText}>{workout}</Text>
                         </TouchableOpacity>
                     ))}
-                </BottomSheetScrollView>
+                </View>
                 {name ? (
                     <>
                         <View style={bottomSheetStyles.weightSection}>
@@ -390,7 +385,7 @@ const InputWorkout = () => {
                         </TouchableOpacity>
                     </>
                 ) : null}
-            </BottomSheetView>
+            </BottomSheetScrollView>
         </BottomSheet>
 
         <BottomSheet
@@ -399,7 +394,10 @@ const InputWorkout = () => {
             snapPoints={snapPoints}
             enablePanDownToClose={true}
         >
-            <BottomSheetView style={bottomSheetStyles.contentContainer}>
+            <BottomSheetScrollView
+                contentContainerStyle={bottomSheetStyles.sheetScrollContent}
+                keyboardShouldPersistTaps="handled"
+            >
                 <Text style={bottomSheetStyles.sheetTitle}>Edit Workout</Text>
 
                 <View style={bottomSheetStyles.categoriesWrapper}>
@@ -422,7 +420,7 @@ const InputWorkout = () => {
                     </ScrollView>
                 </View>
 
-                <BottomSheetScrollView style={bottomSheetStyles.listContainer}>
+                <View style={bottomSheetStyles.exerciseList}>
                     {categories[editSelectedCategory].map((workout, index) => (
                         <TouchableOpacity
                             key={index}
@@ -436,7 +434,7 @@ const InputWorkout = () => {
                             <Text style={bottomSheetStyles.workoutItemText}>{workout}</Text>
                         </TouchableOpacity>
                     ))}
-                </BottomSheetScrollView>
+                </View>
 
                 {editName ? (
                     <>
@@ -483,7 +481,7 @@ const InputWorkout = () => {
                         </TouchableOpacity>
                     </>
                 ) : null}
-            </BottomSheetView>
+            </BottomSheetScrollView>
         </BottomSheet>
         </GestureHandlerRootView>
     )
@@ -641,10 +639,14 @@ const bottomSheetStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'grey',
   },
-  contentContainer: {
-    flex: 1,
-    padding: 36,
-  },
+    contentContainer: {
+        flex: 1,
+        padding: 36,
+    },
+    sheetScrollContent: {
+            padding: 24,
+            paddingBottom: 80,
+    },
     sheetTitle: {
             fontSize: 20,
             fontWeight: 'bold',
@@ -679,8 +681,15 @@ const bottomSheetStyles = StyleSheet.create({
   categoryTextSelected: {
       color: '#FFFFFF',
   },
-  listContainer: {
-      flex: 1,
+  selectedAreaLabel: {
+      marginTop: 6,
+      marginBottom: 6,
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#333',
+  },
+  exerciseList: {
+      width: '100%',
   },
   workoutItem: {
       paddingVertical: 15,
