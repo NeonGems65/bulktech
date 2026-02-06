@@ -43,6 +43,18 @@ const InputWorkout = () => {
         Legs: ['Squats', 'Leg Press', 'Lunges', 'Calf Raises'],
         Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
     };
+
+    const getCategoryForWorkout = (workoutName) => {
+        if (!workoutName) return 'Other';
+
+        for (const category of Object.keys(categories)) {
+            if (categories[category]?.includes(workoutName)) {
+                return category;
+            }
+        }
+
+        return 'Other';
+    };
     
     const kilosWeights = useMemo(() => {
         const weights = [];
@@ -204,6 +216,21 @@ const InputWorkout = () => {
     console.log('handleSheetChanges', index);
   }, []);
 
+    const groupedWorkouts = useMemo(() => {
+        const categoryOrder = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Other'];
+        const groups = Object.fromEntries(categoryOrder.map((c) => [c, []]));
+
+        for (const workout of workouts) {
+            const category = getCategoryForWorkout(workout?.name);
+            if (!groups[category]) groups[category] = [];
+            groups[category].push(workout);
+        }
+
+        return categoryOrder
+            .map((category) => ({ category, workouts: groups[category] ?? [] }))
+            .filter((section) => section.workouts.length > 0);
+    }, [workouts]);
+
     return (
         <GestureHandlerRootView style={styles.container}>
         <Text style={styles.header}> 
@@ -241,32 +268,37 @@ const InputWorkout = () => {
                 <Text style={styles.headerText}>Workout</Text>
             </View>
             <ScrollView style={styles.scrollView}>
-            {workouts.map(workout => (
-                <View key={workout.workout_id} style={styles.row}>
-                    
-                <View style={styles.workoutInfo}>
-                    <Text style={styles.rowText}>{workout.name}</Text>
-                    {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
-                    {workout.created_at ? (
-                        <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
-                    ) : null}
-                </View>
+            {groupedWorkouts.map((section) => (
+                <View key={section.category} style={styles.sectionContainer}>
+                    <Text style={styles.sectionHeader}>{section.category}</Text>
 
-                <View style={styles.rowActions}>
-                    <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => openEditSheet(workout)}
-                    >
-                        <Text style={styles.editButtonText}>Edit</Text>
-                    </TouchableOpacity>
+                    {section.workouts.map((workout) => (
+                        <View key={workout.workout_id} style={styles.row}>
+                            <View style={styles.workoutInfo}>
+                                <Text style={styles.rowText}>{workout.name}</Text>
+                                {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
+                                {workout.created_at ? (
+                                    <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
+                                ) : null}
+                            </View>
 
-                    <TouchableOpacity 
-                        style={styles.deleteButton}
-                        onPress={() => deleteWorkout(workout.workout_id)}
-                    >
-                        <Text style={styles.deleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
-                </View>
+                            <View style={styles.rowActions}>
+                                <TouchableOpacity
+                                    style={styles.editButton}
+                                    onPress={() => openEditSheet(workout)}
+                                >
+                                    <Text style={styles.editButtonText}>Edit</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => deleteWorkout(workout.workout_id)}
+                                >
+                                    <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))}
                 </View>
             ))}
             </ScrollView>
@@ -508,7 +540,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5,
         borderRadius: 8,
         justifyContent: 'center',
-        width: '25%',
+        width: '55%',
         alignItems: 'center',
     },
     buttonText: {
@@ -535,6 +567,17 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         marginBottom: 20,
+    },
+    sectionContainer: {
+        marginBottom: 14,
+    },
+    sectionHeader: {
+        color: '#D32F2F',
+        fontSize: 14,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        marginBottom: 8,
+        marginTop: 6,
     },
     row: {
         flexDirection: 'row',
