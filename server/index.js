@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const app = express();
 const cors = require('cors');
@@ -6,6 +8,10 @@ const pool = require('./db');
 //middleware to parse JSON bodies
 app.use(cors())
 app.use(express.json());
+
+app.get('/health', (_req, res) => {
+    res.json({ ok: true });
+});
 
 
 
@@ -29,6 +35,7 @@ app.post("/workoutlist", async(req,res) =>{
 
     } catch(err) {
         console.error(err.message);
+                res.status(500).json({ error: 'Failed to create workout' });
     }
 } )
 
@@ -42,6 +49,7 @@ app.get('/workoutlist', async(req,res) =>{
     }
     catch (err){
         console.error(err.message);
+        res.status(500).json({ error: 'Failed to fetch workouts' });
     }
 })
 
@@ -55,6 +63,7 @@ app.get('/workoutlist/:id', async(req,res) =>{
     }
     catch (err){
         console.error(err.message);
+        res.status(500).json({ error: 'Failed to fetch workout' });
     }
 })
 
@@ -72,6 +81,7 @@ app.put('/workoutlist/:id', async(req,res) =>{
     }
     catch (err){
         console.error(err.message);
+        res.status(500).json({ error: 'Failed to update workout' });
     }
 })
 
@@ -86,9 +96,11 @@ app.delete('/workoutlist/:id', async(req,res) => {
 
     catch (err){
         console.error(err.message);
+                res.status(500).json({ error: 'Failed to delete workout' });
     }   
 })
 
-app.listen(5000, () => {
-  console.log('Server is running on port 5000');
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
 });

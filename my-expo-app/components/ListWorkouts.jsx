@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { Text, View, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
-import Constants from 'expo-constants';
+import { getApiBaseUrl } from '../config/apiBaseUrl';
 
 const ListWorkout = () => {  
 
     const [workouts, setWorkouts] = useState([]);
 
-    // Dynamically determine the IP address of the computer running Expo
-    const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
-    const ip = debuggerHost?.split(':')[0] ?? 'localhost';
-    const baseUrl = `http://${ip}:5000`;
+    const baseUrl = getApiBaseUrl();
 
     //delete function
     const deleteWorkout = async (id) => {
@@ -29,7 +26,7 @@ const ListWorkout = () => {
     const getWorkouts = async () => {
         try{
             console.log("Initiating fetch request...");
-            const response = await fetch(`${baseUrl}/workoutList`); // by default is a GET request
+            const response = await fetch(`${baseUrl}/workoutlist`); // by default is a GET request
             const jsonData = await response.json();
             console.log(jsonData);
 

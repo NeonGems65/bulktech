@@ -1,9 +1,9 @@
 import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
-import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { getApiBaseUrl } from '../config/apiBaseUrl';
 const InputWorkout = () => {
 
     const formatDateTime = (dateValue) => {
@@ -37,10 +37,10 @@ const InputWorkout = () => {
     const [editSelectedWeight, setEditSelectedWeight] = useState(null);
 
     const categories = {
-        Chest: ['Bench Press', 'Incline Press', 'Chest Fly', 'Push Ups'],
-        Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown'],
-        Arms: ['Bicep Curls', 'Tricep Extensions', 'Hammer Curls', 'Dips'],
-        Legs: ['Squats', 'Leg Press', 'Lunges', 'Calf Raises'],
+        Chest: ['Incline DB Bench Press', 'Chest Fly', 'Chest Press'],
+        Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Row Machine','Rear Delt Fly'],
+        Arms: ['Bayesian Curls', 'Cable Bar Curl', 'Preacher Curls',  'Tricep Extensions', 'Tricep Pulldown', 'Hammer Curls', 'Dips', "Forearm Cable Curls"],
+        Legs: ['Leg Curls', 'Leg Press', 'Leg Extension', 'Calf Raises'],
         Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
     };
 
@@ -72,10 +72,7 @@ const InputWorkout = () => {
         return weights;
     }, []);
 
-    // Dynamically determine the IP address of the computer running Expo
-    const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest?.debuggerHost;
-    const ip = debuggerHost?.split(':')[0] ?? 'localhost';
-    const baseUrl = `http://${ip}:5000`;
+    const baseUrl = getApiBaseUrl();
 
     const formatSelectedWeight = (weightSelection) => {
         if (!weightSelection) return null;
@@ -161,7 +158,7 @@ const InputWorkout = () => {
     const getWorkouts = async () => {
         try{
             console.log("Initiating fetch request...");
-            const response = await fetch(`${baseUrl}/workoutList`); // by default is a GET request
+            const response = await fetch(`${baseUrl}/workoutlist`); // by default is a GET request
             const jsonData = await response.json();
             console.log(jsonData);
 
