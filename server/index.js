@@ -9,6 +9,14 @@ const pool = require('./db');
 app.use(cors())
 app.use(express.json());
 
+app.get('/', (_req, res) => {
+    res.json({
+        ok: true,
+        service: 'bulktech-api',
+        endpoints: ['/health', '/workoutlist']
+    });
+});
+
 app.get('/health', (_req, res) => {
     res.json({ ok: true });
 });
