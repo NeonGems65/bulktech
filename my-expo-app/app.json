@@ -5,7 +5,12 @@
     "version": "1.0.0",
 
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "BulkTech",
+      "shortName": "BulkTech",
+      "display": "standalone",
+      "themeColor": "#000000",
+      "backgroundColor": "#ffffff"
     },
 
     "experiments": {
@@ -26,7 +31,9 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ishaa.bulktech",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {

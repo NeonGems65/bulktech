@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
@@ -35,6 +35,8 @@ const InputWorkout = () => {
     const [editName, setEditName] = useState("");
     const [editSelectedCategory, setEditSelectedCategory] = useState('Chest');
     const [editSelectedWeight, setEditSelectedWeight] = useState(null);
+    const [isOnline, setIsOnline] = useState(true);
+    const [apiUnavailable, setApiUnavailable] = useState(false);
 
     const categories = {
         Chest: ['Incline DB Bench Press', 'Chest Fly', 'Chest Press'],
@@ -73,6 +75,10 @@ const InputWorkout = () => {
     }, []);
 
     const baseUrl = getApiBaseUrl();
+    const showStatusBanner = !isOnline || apiUnavailable;
+    const statusBannerMessage = !isOnline
+        ? 'You are offline. Reconnect to sync workouts.'
+        : 'Server unavailable right now. Retrying soon.';
 
     const formatSelectedWeight = (weightSelection) => {
         if (!weightSelection) return null;
@@ -110,14 +116,21 @@ const InputWorkout = () => {
     //delete function
     const deleteWorkout = async (id) => {
         try{
-            await fetch(`${baseUrl}/workoutlist/${id}`, {
+            const response = await fetch(`${baseUrl}/workoutlist/${id}`, {
                 method: "DELETE"
             });
+
+            if (!response.ok) {
+                throw new Error(`Delete failed with status ${response.status}`);
+            }
+
+            setApiUnavailable(false);
 
             setWorkouts(workouts.filter(workout => workout.workout_id !== id));
 
         } 
         catch(err) {
+            setApiUnavailable(true);
             console.error(err.message);
         }
     }
@@ -129,11 +142,17 @@ const InputWorkout = () => {
             const formattedWeight = formatSelectedWeight(editSelectedWeight);
             const body = { name: editName, weight: formattedWeight };
 
-            await fetch(`${baseUrl}/workoutlist/${editingWorkout.workout_id}`, {
+            const response = await fetch(`${baseUrl}/workoutlist/${editingWorkout.workout_id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
+
+            if (!response.ok) {
+                throw new Error(`Update failed with status ${response.status}`);
+            }
+
+            setApiUnavailable(false);
 
             setEditingWorkout(null);
             setEditName("");
@@ -142,6 +161,7 @@ const InputWorkout = () => {
             editBottomSheetRef.current?.close();
             getWorkouts();
         } catch (err) {
+            setApiUnavailable(true);
             console.error(err.message);
         }
     }
@@ -159,15 +179,41 @@ const InputWorkout = () => {
         try{
             console.log("Initiating fetch request...");
             const response = await fetch(`${baseUrl}/workoutlist`); // by default is a GET request
+
+            if (!response.ok) {
+                throw new Error(`Fetch failed with status ${response.status}`);
+            }
+
             const jsonData = await response.json();
             console.log(jsonData);
 
+            setApiUnavailable(false);
             setWorkouts(jsonData);
         }
         catch(err){ 
+            setApiUnavailable(true);
             console.error(err.message);
         }
     }
+
+    useEffect(() => {
+        if (Platform.OS !== 'web' || typeof window === 'undefined') {
+            return;
+        }
+
+        const updateStatus = () => {
+            setIsOnline(window.navigator.onLine);
+        };
+
+        updateStatus();
+        window.addEventListener('online', updateStatus);
+        window.addEventListener('offline', updateStatus);
+
+        return () => {
+            window.removeEventListener('online', updateStatus);
+            window.removeEventListener('offline', updateStatus);
+        };
+    }, []);
 
     useEffect(() => {
         getWorkouts();
@@ -182,11 +228,17 @@ const InputWorkout = () => {
             const formattedWeight = formatSelectedWeight(selectedWeight);
 
             const body = { name, weight: formattedWeight }
-            await fetch(`${baseUrl}/workoutlist`, {
+            const response = await fetch(`${baseUrl}/workoutlist`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(body)
-            })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Create failed with status ${response.status}`);
+            }
+
+            setApiUnavailable(false);
             setName("");
             DeviceEventEmitter.emit('event.workoutAdded');
             // Close the bottom sheet after successful submission
@@ -197,6 +249,7 @@ const InputWorkout = () => {
         }
 
         catch (err) {
+            setApiUnavailable(true);
             console.error(err.message);
         }
     }
@@ -233,6 +286,11 @@ const InputWorkout = () => {
         <Text style={styles.header}> 
             Bulktech
         </Text>
+        {showStatusBanner ? (
+            <View style={styles.statusBanner}>
+                <Text style={styles.statusBannerText}>{statusBannerMessage}</Text>
+            </View>
+        ) : null}
         <View style={styles.inputGroup} >
             {/* <TextInput 
                 style={styles.input} 
@@ -502,6 +560,20 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
         marginVertical: 20,
+    },
+    statusBanner: {
+        backgroundColor: '#5A1A1A',
+        borderColor: '#D32F2F',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        marginBottom: 12,
+    },
+    statusBannerText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        textAlign: 'center',
     },
     inputGroup: {
         flexDirection: 'column',
