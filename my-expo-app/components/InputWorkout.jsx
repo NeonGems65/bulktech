@@ -60,7 +60,7 @@ const InputWorkout = () => {
     
     const kilosWeights = useMemo(() => {
         const weights = [];
-        for (let i = 2.5; i <= 97.5; i += 5) {
+        for (let i = 2.5; i <= 185; i += 5) {
             weights.push(i);
         }
         return weights;
@@ -68,7 +68,7 @@ const InputWorkout = () => {
 
     const lbsWeights = useMemo(() => {
         const weights = [];
-        for (let i = 10; i <= 200; i += 10) {
+        for (let i = 10; i <= 400; i += 10) {
             weights.push(i);
         }
         return weights;
