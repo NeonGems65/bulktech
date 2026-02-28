@@ -108,6 +108,81 @@ app.delete('/workoutlist/:id', async(req,res) => {
     }   
 })
 
+// CARDIO ENDPOINTS
+
+// Create a cardio entry
+app.post("/cardiolist", async(req,res) => {
+    try{
+        const { name, duration_minutes } = req.body;
+        console.log("Adding cardio:", name, duration_minutes);
+        const newCardio = await pool.query(
+            "INSERT INTO cardiolist (name, duration_minutes) VALUES($1, $2) RETURNING *",
+            [name, duration_minutes]
+        );
+        res.json(newCardio.rows[0]);
+    } catch(err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to create cardio' });
+    }
+})
+
+// Get all cardio entries
+app.get('/cardiolist', async(req,res) => {
+    try{
+        const allCardio = await pool.query(
+            "SELECT * FROM cardiolist ORDER BY created_at DESC NULLS LAST, cardio_id DESC"
+        );
+        res.json(allCardio.rows);
+    }
+    catch (err){
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to fetch cardio' });
+    }
+})
+
+// Get a single cardio entry
+app.get('/cardiolist/:id', async(req,res) => {
+    try {
+        const { id } = req.params;
+        const cardio = await pool.query("SELECT * FROM cardiolist WHERE cardio_id = $1", [id]);
+        res.json(cardio.rows[0]);
+    }
+    catch (err){
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to fetch cardio' });
+    }
+})
+
+// Update a cardio entry
+app.put('/cardiolist/:id', async(req,res) => {
+    try{
+        const {id} = req.params;
+        const { name, duration_minutes } = req.body;
+        
+        const updateCardio = await pool.query("UPDATE cardiolist SET name = $1, duration_minutes = $2 WHERE cardio_id = $3",
+            [name, duration_minutes, id]);
+        
+        res.json("Cardio was updated!");
+    }
+    catch (err){
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to update cardio' });
+    }
+})
+
+// Delete a cardio entry
+app.delete('/cardiolist/:id', async(req,res) => {
+    try{
+        const {id} = req.params;
+        const deleteCardio = await pool.query("DELETE FROM cardiolist WHERE cardio_id = $1", [id]);  
+        res.json("Cardio was deleted!");
+    }
+    catch (err){
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to delete cardio' });
+    }   
+})
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
