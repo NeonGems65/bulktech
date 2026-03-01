@@ -61,6 +61,22 @@ app.get('/workoutlist', async(req,res) =>{
     }
 })
 
+//get Workouts by body part
+app.get('/workoutlist/bodypart/:bodypart', async(req,res) =>{
+    try{
+        const { bodypart } = req.params;
+        const allWorkouts = await pool.query(
+          "SELECT * FROM workoutlist WHERE body_part = $1 ORDER BY created_at DESC NULLS LAST, workout_id DESC",
+          [bodypart]
+        );
+        res.json(allWorkouts.rows);
+    }
+    catch (err){
+        console.error(err.message);
+        res.status(500).json({ error: 'Failed to fetch workouts' });
+    }
+})
+
 //get a Workout
 app.get('/workoutlist/:id', async(req,res) =>{
     try {

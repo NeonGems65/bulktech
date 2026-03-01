@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Text, View, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView } from 'react-native';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
 
-const ListWorkout = () => {  
+const ListWorkout = ({ selectedBodyPart }) => {  
 
     const [workouts, setWorkouts] = useState([]);
 
@@ -25,8 +25,12 @@ const ListWorkout = () => {
     // get function
     const getWorkouts = async () => {
         try{
+            let url = `${baseUrl}/workoutlist`;
+            if (selectedBodyPart) {
+                url = `${baseUrl}/workoutlist/bodypart/${selectedBodyPart}`;
+            }
             console.log("Initiating fetch request...");
-            const response = await fetch(`${baseUrl}/workoutlist`); // by default is a GET request
+            const response = await fetch(url); // by default is a GET request
             const jsonData = await response.json();
             console.log(jsonData);
 
@@ -43,7 +47,7 @@ const ListWorkout = () => {
         return () => {
             subscription.remove();
         };
-    }, []);
+    }, [selectedBodyPart]);
 
 
 return (
