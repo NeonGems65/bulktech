@@ -35,5 +35,7 @@ const styles = StyleSheet.create({
   modelContainer: {
     flex: 1,
     paddingTop: 50,
+    borderColor: '#fff',
+    borderWidth: 1,
   },
 });

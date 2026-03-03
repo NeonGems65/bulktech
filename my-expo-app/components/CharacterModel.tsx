@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber/native';
 import { OrbitControls, useGLTF } from '@react-three/drei/native';
 import * as THREE from 'three';
+import { ThreeEvent } from '@react-three/fiber';
+import { Object3D } from 'three';
 
 // Suppress Expo GL pixelStorei warning (known limitation in Expo GL)
 const originalLog = console.log;
@@ -21,12 +23,13 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 
-const Model = ({ onSelectBodyPart }) => {
-  const { scene } = useGLTF(require('../assets/character.glb'));
-  const [hovered, setHovered] = useState(null);
+const Model = ({ onSelectBodyPart }: { onSelectBodyPart: (bodyPart: string) => void }) => {
+  const gltf = useGLTF(require('../assets/character.glb'));
+  const scene = (gltf as any).scene || (Array.isArray(gltf) ? gltf[0].scene : gltf.scene);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => {
-    scene.traverse((child) => {
+    scene.traverse((child: any) => {
       if (child.isMesh && child.material) {
         // Remove ALL texture types to avoid pixelStorei issues in Expo GL
         const texturesToRemove = [
@@ -48,11 +51,11 @@ const Model = ({ onSelectBodyPart }) => {
     });
   }, [scene]);
 
-  const handleClick = (event) => {
+  const handleClick = (event: ThreeEvent<MouseEvent>) => {
     const { intersections } = event;
     if (intersections.length > 0) {
       const selectedObject = intersections[0].object;
-      let parent = selectedObject;
+      let parent: any = selectedObject;
       while (parent) {
         if (parent.name) {
           onSelectBodyPart(parent.name);
@@ -66,16 +69,16 @@ const Model = ({ onSelectBodyPart }) => {
   return <primitive object={scene} onClick={handleClick} scale={1.5} />;
 };
 
-const CharacterModel = ({ onSelectBodyPart }) => {
+const CharacterModel = ({ onSelectBodyPart }: { onSelectBodyPart: (bodyPart: string) => void }) => {
   return (
     <Canvas
-      camera={{ position: [0, 0, 9], fov: 50 }}
+      camera={{ position: [0, 0, 9], fov: 40 }}
       gl={{ 
         antialias: false, 
         powerPreference: 'high-performance',
         alpha: true
       }}
-      style={{ touchAction: 'none' }}
+      style={{ pointerEvents: 'auto' } as any}
     >
       <ambientLight intensity={0.5} />
       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
