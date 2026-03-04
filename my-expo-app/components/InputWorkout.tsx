@@ -1,18 +1,30 @@
 import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
+
+type WorkoutEntry = {
+    workout_id: number;
+    name: string;
+    weight: string | null;
+    created_at: string;
+};
+
 const InputWorkout = () => {
 
-    const formatDateTime = (dateValue) => {
+    const getErrorMessage = (error: unknown) => {
+        return error instanceof Error ? error.message : String(error);
+    };
+
+    const formatDateTime = (dateValue: string | Date | null | undefined) => {
         if (!dateValue) return "";
 
         const date = new Date(dateValue);
         if (Number.isNaN(date.getTime())) return "";
 
-        // Prefer Intl when available for consistent formatting
         try {
             return new Intl.DateTimeFormat(undefined, {
                 year: 'numeric',
@@ -26,19 +38,36 @@ const InputWorkout = () => {
         }
     };
 
-    const [name, setName] = useState("");
-    const [workouts, setWorkouts] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('Chest');
-    const [selectedWeight, setSelectedWeight] = useState(null);
+    const formatDateInputValue = (date: Date) => {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
 
-    const [editingWorkout, setEditingWorkout] = useState(null);
+    const formatTimeInputValue = (date: Date) => {
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    };
+
+    const [name, setName] = useState("");
+    const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState('Chest');
+    const [selectedWeight, setSelectedWeight] = useState<string | null>(null);
+    const [selectedWeightUnit, setSelectedWeightUnit] = useState<'l' | 'k'>('l');
+    const [selectedDateTime, setSelectedDateTime] = useState(new Date());
+    const [showAddDatePicker, setShowAddDatePicker] = useState(false);
+    const [showAddTimePicker, setShowAddTimePicker] = useState(false);
+
+    const [editingWorkout, setEditingWorkout] = useState<WorkoutEntry | null>(null);
     const [editName, setEditName] = useState("");
     const [editSelectedCategory, setEditSelectedCategory] = useState('Chest');
-    const [editSelectedWeight, setEditSelectedWeight] = useState(null);
+    const [editSelectedWeight, setEditSelectedWeight] = useState<string | null>(null);
+    const [editWeightUnit, setEditWeightUnit] = useState<'l' | 'k'>('l');
+    const [editDateTime, setEditDateTime] = useState(new Date());
+    const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+    const [showEditTimePicker, setShowEditTimePicker] = useState(false);
+    
     const [isOnline, setIsOnline] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
 
-    const categories = {
+    const categories: Record<string, string[]> = {
         Chest: ['Incline DB Bench Press', 'Chest Fly', 'Chest Press'],
         Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Row Machine','Rear Delt Fly'],
         Arms: ['Bayesian Curls', 'Cable Bar Curl', 'Preacher Curls',  'Tricep Extensions', 'Tricep Pulldown', 'Hammer Curls', 'Dips', "Forearm Cable Curls"],
@@ -46,7 +75,7 @@ const InputWorkout = () => {
         Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
     };
 
-    const getCategoryForWorkout = (workoutName) => {
+    const getCategoryForWorkout = (workoutName: string | null | undefined) => {
         if (!workoutName) return 'Other';
 
         for (const category of Object.keys(categories)) {
@@ -80,14 +109,14 @@ const InputWorkout = () => {
         ? 'You are offline. Reconnect to sync workouts.'
         : 'Server unavailable right now. Retrying soon.';
 
-    const formatSelectedWeight = (weightSelection) => {
+    const formatSelectedWeight = (weightSelection: string | null) => {
         if (!weightSelection) return null;
         if (weightSelection.startsWith('k-')) return `${weightSelection.split('-')[1]} kg`;
         if (weightSelection.startsWith('l-')) return `${weightSelection.split('-')[1]} lbs`;
         return null;
     }
 
-    const parseWeightToSelection = (weightString) => {
+    const parseWeightToSelection = (weightString: string | null | undefined) => {
         if (!weightString || typeof weightString !== 'string') return null;
 
         const trimmed = weightString.trim().toLowerCase();
@@ -101,7 +130,7 @@ const InputWorkout = () => {
         return `l-${value}`;
     }
 
-    const findCategoryForWorkoutName = (workoutName) => {
+    const findCategoryForWorkoutName = (workoutName: string | null | undefined) => {
         if (!workoutName) return 'Chest';
 
         for (const category of Object.keys(categories)) {
@@ -113,8 +142,64 @@ const InputWorkout = () => {
         return 'Chest';
     }
 
+    const onAddDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowAddDatePicker(false);
+        }
+
+        if (date) {
+            setSelectedDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onAddTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowAddTimePicker(false);
+        }
+
+        if (date) {
+            setSelectedDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onEditDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowEditDatePicker(false);
+        }
+
+        if (date) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onEditTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowEditTimePicker(false);
+        }
+
+        if (date) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                return nextDateTime;
+            });
+        }
+    };
+
     //delete function
-    const deleteWorkout = async (id) => {
+    const deleteWorkout = async (id: number) => {
         try{
             const response = await fetch(`${baseUrl}/workoutlist/${id}`, {
                 method: "DELETE"
@@ -131,7 +216,7 @@ const InputWorkout = () => {
         } 
         catch(err) {
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
@@ -140,7 +225,9 @@ const InputWorkout = () => {
 
         try {
             const formattedWeight = formatSelectedWeight(editSelectedWeight);
-            const body = { name: editName, weight: formattedWeight };
+            const created_at = editDateTime.toISOString();
+
+            const body = { name: editName, weight: formattedWeight, created_at };
 
             const response = await fetch(`${baseUrl}/workoutlist/${editingWorkout.workout_id}`, {
                 method: "PUT",
@@ -157,20 +244,32 @@ const InputWorkout = () => {
             setEditingWorkout(null);
             setEditName("");
             setEditSelectedWeight(null);
+            setEditWeightUnit('l');
             setEditSelectedCategory('Chest');
+            setEditDateTime(new Date());
+            setShowEditDatePicker(false);
+            setShowEditTimePicker(false);
             editBottomSheetRef.current?.close();
             getWorkouts();
         } catch (err) {
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
-    const openEditSheet = (workout) => {
+    const openEditSheet = (workout: WorkoutEntry) => {
         setEditingWorkout(workout);
         setEditName(workout?.name ?? "");
         setEditSelectedCategory(findCategoryForWorkoutName(workout?.name));
-        setEditSelectedWeight(parseWeightToSelection(workout?.weight));
+        const parsedWeight = parseWeightToSelection(workout?.weight);
+        setEditSelectedWeight(parsedWeight);
+        setEditWeightUnit(parsedWeight?.startsWith('k-') ? 'k' : 'l');
+
+        const workoutDate = new Date(workout.created_at);
+        setEditDateTime(Number.isNaN(workoutDate.getTime()) ? new Date() : workoutDate);
+        setShowEditDatePicker(false);
+        setShowEditTimePicker(false);
+
         editBottomSheetRef.current?.expand();
     }
 
@@ -192,7 +291,7 @@ const InputWorkout = () => {
         }
         catch(err){ 
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
@@ -223,11 +322,11 @@ const InputWorkout = () => {
 
         try{
             console.log("Submitting form...");
-           
-            // format selected weight into readable string (e.g. "10 kg" or "20 lbs")
-            const formattedWeight = formatSelectedWeight(selectedWeight);
 
-            const body = { name, weight: formattedWeight }
+            const formattedWeight = formatSelectedWeight(selectedWeight);
+            const created_at = selectedDateTime.toISOString();
+
+            const body = { name, weight: formattedWeight, created_at }
             const response = await fetch(`${baseUrl}/workoutlist`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -240,35 +339,40 @@ const InputWorkout = () => {
 
             setApiUnavailable(false);
             setName("");
+            setSelectedWeight(null);
+            setSelectedWeightUnit('l');
+            setSelectedDateTime(new Date());
+            setShowAddDatePicker(false);
+            setShowAddTimePicker(false);
             DeviceEventEmitter.emit('event.workoutAdded');
             // Close the bottom sheet after successful submission
             bottomSheetRef.current?.close();
-            // clear selected weight
-            setSelectedWeight(null);
             getWorkouts();
         }
 
-        catch (err) {
+                catch (err) {
             setApiUnavailable(true);
-            console.error(err.message);
+                        console.error(getErrorMessage(err));
         }
     }
 
     // ref
-  const bottomSheetRef = useRef(null);
-    const editBottomSheetRef = useRef(null);
+    const bottomSheetRef = useRef<any>(null);
+        const editBottomSheetRef = useRef<any>(null);
 
   // variables
   const snapPoints = useMemo(() => ['90%'], []);
 
   // callbacks
-  const handleSheetChanges = useCallback((index) => {
+    const handleSheetChanges = useCallback((index: number) => {
     console.log('handleSheetChanges', index);
   }, []);
 
     const groupedWorkouts = useMemo(() => {
         const categoryOrder = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Other'];
-        const groups = Object.fromEntries(categoryOrder.map((c) => [c, []]));
+        const groups: Record<string, WorkoutEntry[]> = Object.fromEntries(
+            categoryOrder.map((category) => [category, [] as WorkoutEntry[]])
+        );
 
         for (const workout of workouts) {
             const category = getCategoryForWorkout(workout?.name);
@@ -366,7 +470,7 @@ const InputWorkout = () => {
             enablePanDownToClose={true}
             onChange={handleSheetChanges}
         >
-            <BottomSheetView style={bottomSheetStyles.contentContainer}>
+            <BottomSheetScrollView style={bottomSheetStyles.contentContainer} showsVerticalScrollIndicator={true}>
                 <View style={bottomSheetStyles.categoriesWrapper}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={bottomSheetStyles.categoriesContainer}>
                         {Object.keys(categories).map((cat) => (
@@ -403,49 +507,97 @@ const InputWorkout = () => {
                 </BottomSheetScrollView>
                 {name ? (
                     <>
-                        <View style={bottomSheetStyles.weightSection}>
-                        <View style={bottomSheetStyles.weightColumn}>
-                            <Text style={bottomSheetStyles.weightHeader}>Kilos</Text>
-                            <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
-                                {kilosWeights.map((w) => (
-                                    <TouchableOpacity 
-                                        key={w} 
-                                        style={[
-                                            bottomSheetStyles.weightItem,
-                                            selectedWeight === `k-${w}` && { backgroundColor: '#E0E0E0' }
-                                        ]}
-                                        onPress={() => setSelectedWeight(`k-${w}`)}
-                                        
+                        <View style={bottomSheetStyles.formSectionsRow}>
+                            <View style={bottomSheetStyles.weightSection}>
+                                <View style={bottomSheetStyles.weightColumn}>
+                                    <Text style={bottomSheetStyles.weightHeader}>Weight</Text>
+                                    <View style={bottomSheetStyles.unitToggleRow}>
+                                        <TouchableOpacity
+                                            style={[
+                                                bottomSheetStyles.unitToggleButton,
+                                                selectedWeightUnit === 'l' && bottomSheetStyles.unitToggleButtonActive,
+                                            ]}
+                                            onPress={() => setSelectedWeightUnit('l')}
+                                        >
+                                            <Text style={[
+                                                bottomSheetStyles.unitToggleText,
+                                                selectedWeightUnit === 'l' && bottomSheetStyles.categoryTextSelected,
+                                            ]}>Lbs</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                bottomSheetStyles.unitToggleButton,
+                                                selectedWeightUnit === 'k' && bottomSheetStyles.unitToggleButtonActive,
+                                            ]}
+                                            onPress={() => setSelectedWeightUnit('k')}
+                                        >
+                                            <Text style={[
+                                                bottomSheetStyles.unitToggleText,
+                                                selectedWeightUnit === 'k' && bottomSheetStyles.categoryTextSelected,
+                                            ]}>Kilos</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                        {(selectedWeightUnit === 'l' ? lbsWeights : kilosWeights).map((w) => (
+                                            <TouchableOpacity
+                                                key={`${selectedWeightUnit}-${w}`}
+                                                style={[
+                                                    bottomSheetStyles.weightItem,
+                                                    selectedWeight === `${selectedWeightUnit}-${w}` && { backgroundColor: '#E0E0E0' }
+                                                ]}
+                                                onPress={() => setSelectedWeight(`${selectedWeightUnit}-${w}`)}
+                                            >
+                                                <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            </View>
+
+                            <View style={bottomSheetStyles.dateTimeSection}>
+                                <Text style={bottomSheetStyles.sectionLabel}>Date & Time (Optional)</Text>
+                                <View style={bottomSheetStyles.dateTimeField}>
+                                    <Text style={bottomSheetStyles.fieldLabel}>Date</Text>
+                                    <TouchableOpacity
+                                        style={bottomSheetStyles.dateTimeInput}
+                                        onPress={() => setShowAddDatePicker(true)}
                                     >
-                                        <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(selectedDateTime)}</Text>
                                     </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                        <View style={bottomSheetStyles.weightColumn}>
-                            <Text style={bottomSheetStyles.weightHeader}>Lbs</Text>
-                            <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
-                                {lbsWeights.map((w) => (
-                                    <TouchableOpacity 
-                                        key={w} 
-                                        style={[
-                                            bottomSheetStyles.weightItem,
-                                            selectedWeight === `l-${w}` && { backgroundColor: '#E0E0E0' }
-                                        ]}
-                                        onPress={() => setSelectedWeight(`l-${w}`)}
+                                    {showAddDatePicker ? (
+                                        <DateTimePicker
+                                            value={selectedDateTime}
+                                            mode="date"
+                                            display="default"
+                                            onChange={onAddDateChange}
+                                        />
+                                    ) : null}
+                                </View>
+                                <View style={bottomSheetStyles.dateTimeField}>
+                                    <Text style={bottomSheetStyles.fieldLabel}>Time</Text>
+                                    <TouchableOpacity
+                                        style={bottomSheetStyles.dateTimeInput}
+                                        onPress={() => setShowAddTimePicker(true)}
                                     >
-                                        <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(selectedDateTime)}</Text>
                                     </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
+                                    {showAddTimePicker ? (
+                                        <DateTimePicker
+                                            value={selectedDateTime}
+                                            mode="time"
+                                            display="default"
+                                            onChange={onAddTimeChange}
+                                        />
+                                    ) : null}
+                                </View>
+                            </View>
                         </View>
                         <TouchableOpacity style={bottomSheetStyles.addButton} onPress={onSubmitForm}>
                             <Text style={bottomSheetStyles.addButtonText}>Add</Text>
                         </TouchableOpacity>
                     </>
                 ) : null}
-            </BottomSheetView>
+            </BottomSheetScrollView>
         </BottomSheet>
 
         <BottomSheet
@@ -454,7 +606,7 @@ const InputWorkout = () => {
             snapPoints={snapPoints}
             enablePanDownToClose={true}
         >
-            <BottomSheetView style={bottomSheetStyles.contentContainer}>
+            <BottomSheetScrollView style={bottomSheetStyles.contentContainer} showsVerticalScrollIndicator={true}>
                 <Text style={bottomSheetStyles.sheetTitle}>Edit Workout</Text>
 
                 <View style={bottomSheetStyles.categoriesWrapper}>
@@ -495,41 +647,89 @@ const InputWorkout = () => {
 
                 {editName ? (
                     <>
-                        <View style={bottomSheetStyles.weightSection}>
-                            <View style={bottomSheetStyles.weightColumn}>
-                                <Text style={bottomSheetStyles.weightHeader}>Kilos</Text>
-                                <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
-                                    {kilosWeights.map((w) => (
+                        <View style={bottomSheetStyles.formSectionsRow}>
+                            <View style={bottomSheetStyles.weightSection}>
+                                <View style={bottomSheetStyles.weightColumn}>
+                                    <Text style={bottomSheetStyles.weightHeader}>Weight</Text>
+                                    <View style={bottomSheetStyles.unitToggleRow}>
                                         <TouchableOpacity
-                                            key={w}
                                             style={[
-                                                bottomSheetStyles.weightItem,
-                                                editSelectedWeight === `k-${w}` && { backgroundColor: '#E0E0E0' }
+                                                bottomSheetStyles.unitToggleButton,
+                                                editWeightUnit === 'l' && bottomSheetStyles.unitToggleButtonActive,
                                             ]}
-                                            onPress={() => setEditSelectedWeight(`k-${w}`)}
+                                            onPress={() => setEditWeightUnit('l')}
                                         >
-                                            <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                            <Text style={[
+                                                bottomSheetStyles.unitToggleText,
+                                                editWeightUnit === 'l' && bottomSheetStyles.categoryTextSelected,
+                                            ]}>Lbs</Text>
                                         </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                                        <TouchableOpacity
+                                            style={[
+                                                bottomSheetStyles.unitToggleButton,
+                                                editWeightUnit === 'k' && bottomSheetStyles.unitToggleButtonActive,
+                                            ]}
+                                            onPress={() => setEditWeightUnit('k')}
+                                        >
+                                            <Text style={[
+                                                bottomSheetStyles.unitToggleText,
+                                                editWeightUnit === 'k' && bottomSheetStyles.categoryTextSelected,
+                                            ]}>Kilos</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
+                                        {(editWeightUnit === 'l' ? lbsWeights : kilosWeights).map((w) => (
+                                            <TouchableOpacity
+                                                key={`${editWeightUnit}-${w}`}
+                                                style={[
+                                                    bottomSheetStyles.weightItem,
+                                                    editSelectedWeight === `${editWeightUnit}-${w}` && { backgroundColor: '#E0E0E0' }
+                                                ]}
+                                                onPress={() => setEditSelectedWeight(`${editWeightUnit}-${w}`)}
+                                            >
+                                                <Text style={bottomSheetStyles.weightText}>{w}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
                             </View>
 
-                            <View style={bottomSheetStyles.weightColumn}>
-                                <Text style={bottomSheetStyles.weightHeader}>Lbs</Text>
-                                <ScrollView style={bottomSheetStyles.weightList} nestedScrollEnabled>
-                                    {lbsWeights.map((w) => (
-                                        <TouchableOpacity
-                                            key={w}
-                                            style={[
-                                                bottomSheetStyles.weightItem,
-                                                editSelectedWeight === `l-${w}` && { backgroundColor: '#E0E0E0' }
-                                            ]}
-                                            onPress={() => setEditSelectedWeight(`l-${w}`)}
-                                        >
-                                            <Text style={bottomSheetStyles.weightText}>{w}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                            <View style={bottomSheetStyles.dateTimeSection}>
+                                <Text style={bottomSheetStyles.sectionLabel}>Date & Time</Text>
+                                <View style={bottomSheetStyles.dateTimeField}>
+                                    <Text style={bottomSheetStyles.fieldLabel}>Date</Text>
+                                    <TouchableOpacity
+                                        style={bottomSheetStyles.dateTimeInput}
+                                        onPress={() => setShowEditDatePicker(true)}
+                                    >
+                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(editDateTime)}</Text>
+                                    </TouchableOpacity>
+                                    {showEditDatePicker ? (
+                                        <DateTimePicker
+                                            value={editDateTime}
+                                            mode="date"
+                                            display="default"
+                                            onChange={onEditDateChange}
+                                        />
+                                    ) : null}
+                                </View>
+                                <View style={bottomSheetStyles.dateTimeField}>
+                                    <Text style={bottomSheetStyles.fieldLabel}>Time</Text>
+                                    <TouchableOpacity
+                                        style={bottomSheetStyles.dateTimeInput}
+                                        onPress={() => setShowEditTimePicker(true)}
+                                    >
+                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(editDateTime)}</Text>
+                                    </TouchableOpacity>
+                                    {showEditTimePicker ? (
+                                        <DateTimePicker
+                                            value={editDateTime}
+                                            mode="time"
+                                            display="default"
+                                            onChange={onEditTimeChange}
+                                        />
+                                    ) : null}
+                                </View>
                             </View>
                         </View>
 
@@ -538,8 +738,9 @@ const InputWorkout = () => {
                         </TouchableOpacity>
                     </>
                 ) : null}
-            </BottomSheetView>
+            </BottomSheetScrollView>
         </BottomSheet>
+
         </GestureHandlerRootView>
     )
 }
@@ -583,7 +784,6 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     input: {
-        flex: "row",
         backgroundColor: '#1E1E1E',
         color: '#FFFFFF',
         padding: 15,
@@ -594,7 +794,6 @@ const styles = StyleSheet.create({
         width: '50%',
     },
     smallInput: {
-        flex: "row",
         backgroundColor: '#1E1E1E',
         color: '#FFFFFF',
         padding: 15,
@@ -678,29 +877,30 @@ const styles = StyleSheet.create({
     rowActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 6,
         marginLeft: 10,
+        flexWrap: 'wrap',
     },
     editButton: {
         backgroundColor: '#555555',
         paddingVertical: 8,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         borderRadius: 5,
     },
     editButtonText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
     },
     deleteButton: {
         backgroundColor: '#D32F2F',
         paddingVertical: 8,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         borderRadius: 5,
     },
     deleteButtonText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
     },
 });
@@ -764,24 +964,49 @@ const bottomSheetStyles = StyleSheet.create({
       fontSize: 18,
       color: '#333',
   },
-  weightSection: {
+  formSectionsRow: {
       flexDirection: 'row',
-      height: 200,
+      gap: 12,
+      marginTop: 10,
+      alignItems: 'flex-start',
+  },
+  weightSection: {
+      width: '48%',
+      height: 240,
       borderTopWidth: 1,
       borderTopColor: '#ccc',
-      marginTop: 10,
       paddingTop: 10,
-      gap: 20
   },
   weightColumn: {
       flex: 1,
-      alignItems: 'center',
+      alignItems: 'stretch',
   },
   weightHeader: {
       fontSize: 16,
       fontWeight: 'bold',
       marginBottom: 10,
       color: '#333',
+  },
+  unitToggleRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 10,
+  },
+  unitToggleButton: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: '#D32F2F',
+      borderRadius: 8,
+      paddingVertical: 8,
+      alignItems: 'center',
+      backgroundColor: '#f5f5f5',
+  },
+  unitToggleButtonActive: {
+      backgroundColor: '#D32F2F',
+  },
+  unitToggleText: {
+      color: '#333',
+      fontWeight: '600',
   },
   weightList: {
       width: '100%',
@@ -811,6 +1036,45 @@ const bottomSheetStyles = StyleSheet.create({
       fontWeight: 'bold',
       fontSize: 16,
       textTransform: 'uppercase',
+  },
+  dateTimeSection: {
+      width: '48%',
+      paddingTop: 20,
+      borderTopWidth: 1,
+      borderTopColor: '#ccc',
+  },
+  sectionLabel: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 12,
+      color: '#333',
+  },
+  dateTimeRow: {
+      flexDirection: 'column',
+      gap: 8,
+  },
+  dateTimeField: {
+      flex: 1,
+  },
+  fieldLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginBottom: 6,
+      color: '#D32F2F',
+  },
+  dateTimeInput: {
+      backgroundColor: '#f5f5f5',
+      borderWidth: 1,
+      borderColor: '#D32F2F',
+      borderRadius: 6,
+      padding: 10,
+      minHeight: 42,
+      justifyContent: 'center',
+  },
+  dateTimeInputText: {
+      fontSize: 14,
+      color: '#333',
+      fontWeight: '500',
   },
 });
 

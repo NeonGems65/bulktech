@@ -80,10 +80,10 @@ app.put('/workoutlist/:id', async(req,res) =>{
 
     try{
         const {id} = req.params;
-        const { name, weight } = req.body;
+        const { name, weight, created_at } = req.body;
         
-        const updateWorkout = await pool.query("UPDATE workoutlist SET name = $1, weight = $2 WHERE workout_id = $3",
-            [name, weight, id]);
+        const updateWorkout = await pool.query("UPDATE workoutlist SET name = $1, weight = $2, created_at = $3 WHERE workout_id = $4",
+            [name, weight, created_at || new Date(), id]);
         
         res.json("Workout was updated!");
     }
@@ -157,10 +157,10 @@ app.get('/cardiolist/:id', async(req,res) => {
 app.put('/cardiolist/:id', async(req,res) => {
     try{
         const {id} = req.params;
-        const { name, duration_minutes } = req.body;
+        const { name, duration_minutes, created_at } = req.body;
         
-        const updateCardio = await pool.query("UPDATE cardiolist SET name = $1, duration_minutes = $2 WHERE cardio_id = $3",
-            [name, duration_minutes, id]);
+        const updateCardio = await pool.query("UPDATE cardiolist SET name = $1, duration_minutes = $2, created_at = $3 WHERE cardio_id = $4",
+            [name, duration_minutes, created_at || new Date(), id]);
         
         res.json("Cardio was updated!");
     }

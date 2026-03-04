@@ -4,10 +4,22 @@ import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
+import { getCachedCardio, cacheCardio, clearCardioCache } from '../utils/cardioCache';
+
+type CardioEntry = {
+    cardio_id: number;
+    name: string;
+    duration_minutes: number;
+    created_at: string;
+};
 
 const CardioTracker = () => {
 
-    const formatDateTime = (dateValue) => {
+    const getErrorMessage = (error: unknown) => {
+        return error instanceof Error ? error.message : String(error);
+    };
+
+    const formatDateTime = (dateValue: string | Date | null | undefined) => {
         if (!dateValue) return "";
 
         const date = new Date(dateValue);
@@ -26,13 +38,17 @@ const CardioTracker = () => {
         }
     };
 
-    const [selectedCardio, setSelectedCardio] = useState(null);
+    const [selectedCardio, setSelectedCardio] = useState<string | null>(null);
     const [duration, setDuration] = useState("");
-    const [cardioList, setCardioList] = useState([]);
+    const [selectedDate, setSelectedDate] = useState("");
+    const [selectedTime, setSelectedTime] = useState("");
+    const [cardioList, setCardioList] = useState<CardioEntry[]>([]);
     
-    const [editingCardio, setEditingCardio] = useState(null);
-    const [editSelectedCardio, setEditSelectedCardio] = useState(null);
+    const [editingCardio, setEditingCardio] = useState<CardioEntry | null>(null);
+    const [editSelectedCardio, setEditSelectedCardio] = useState<string | null>(null);
     const [editDuration, setEditDuration] = useState("");
+    const [editDate, setEditDate] = useState("");
+    const [editTime, setEditTime] = useState("");
 
     const [isOnline, setIsOnline] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
@@ -55,7 +71,7 @@ const CardioTracker = () => {
         : 'Server unavailable right now. Retrying soon.';
 
     // Delete cardio entry
-    const deleteCardio = async (id) => {
+    const deleteCardio = async (id: number) => {
         try{
             const response = await fetch(`${baseUrl}/cardiolist/${id}`, {
                 method: "DELETE"
@@ -67,10 +83,12 @@ const CardioTracker = () => {
 
             setApiUnavailable(false);
             setCardioList(cardioList.filter(cardio => cardio.cardio_id !== id));
+            // Clear cache after deletion
+            await clearCardioCache();
         } 
         catch(err) {
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
@@ -79,7 +97,16 @@ const CardioTracker = () => {
         if (!editingCardio) return;
 
         try {
-            const body = { name: editSelectedCardio, duration_minutes: parseInt(editDuration) };
+            // Parse date/time if provided
+            let created_at = editingCardio.created_at;
+            if (editDate && editTime) {
+                const [year, month, day] = editDate.split('-').map(Number);
+                const [hours, minutes] = editTime.split(':').map(Number);
+                const newDateTime = new Date(year, month - 1, day, hours, minutes);
+                created_at = newDateTime.toISOString();
+            }
+            
+            const body = { name: editSelectedCardio, duration_minutes: parseInt(editDuration), created_at };
 
             const response = await fetch(`${baseUrl}/cardiolist/${editingCardio.cardio_id}`, {
                 method: "PUT",
@@ -95,19 +122,31 @@ const CardioTracker = () => {
             setEditingCardio(null);
             setEditSelectedCardio(null);
             setEditDuration("");
+            setEditDate("");
+            setEditTime("");
             editBottomSheetRef.current?.close();
+            // Clear cache after update so fresh data is fetched
+            await clearCardioCache();
             getCardioList();
         } catch (err) {
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
     // Open edit sheet
-    const openEditSheet = (cardio) => {
+    const openEditSheet = (cardio: CardioEntry) => {
         setEditingCardio(cardio);
         setEditSelectedCardio(cardio?.name ?? "");
         setEditDuration(cardio?.duration_minutes?.toString() ?? "");
+        
+        // Set date and time
+        const date = new Date(cardio.created_at);
+        const dateStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+        const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+        setEditDate(dateStr);
+        setEditTime(timeStr);
+        
         editBottomSheetRef.current?.expand();
     }
 
@@ -124,10 +163,12 @@ const CardioTracker = () => {
             const jsonData = await response.json();
             setApiUnavailable(false);
             setCardioList(jsonData);
+            // Update cache with fresh data
+            await cacheCardio(jsonData);
         }
         catch(err){ 
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
@@ -151,6 +192,23 @@ const CardioTracker = () => {
     }, []);
 
     useEffect(() => {
+        // Load from cache first for instant display
+        const loadCardio = async () => {
+            try {
+                const cachedData = await getCachedCardio();
+                if (cachedData) {
+                    console.log("Loading cardio from cache...");
+                    setCardioList(cachedData);
+                }
+            } catch (error) {
+                console.error("Error loading cached cardio:", error);
+            }
+        };
+
+        // Load from cache immediately
+        loadCardio();
+        
+        // Then fetch fresh data from server in the background
         getCardioList();
     }, []);
 
@@ -161,7 +219,16 @@ const CardioTracker = () => {
         try{
             console.log("Submitting cardio...");
             
-            const body = { name: selectedCardio, duration_minutes: parseInt(duration) }
+            // Parse date/time if provided, otherwise use current time
+            let created_at = new Date().toISOString();
+            if (selectedDate && selectedTime) {
+                const [year, month, day] = selectedDate.split('-').map(Number);
+                const [hours, minutes] = selectedTime.split(':').map(Number);
+                const newDateTime = new Date(year, month - 1, day, hours, minutes);
+                created_at = newDateTime.toISOString();
+            }
+            
+            const body = { name: selectedCardio, duration_minutes: parseInt(duration), created_at }
             const response = await fetch(`${baseUrl}/cardiolist`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -175,20 +242,24 @@ const CardioTracker = () => {
             setApiUnavailable(false);
             setSelectedCardio(null);
             setDuration("");
+            setSelectedDate("");
+            setSelectedTime("");
             bottomSheetRef.current?.close();
+            // Clear cache after adding new cardio so fresh data is fetched
+            await clearCardioCache();
             getCardioList();
         }
         catch (err) {
             setApiUnavailable(true);
-            console.error(err.message);
+            console.error(getErrorMessage(err));
         }
     }
 
-    const bottomSheetRef = useRef(null);
-    const editBottomSheetRef = useRef(null);
+    const bottomSheetRef = useRef<any>(null);
+    const editBottomSheetRef = useRef<any>(null);
     const snapPoints = useMemo(() => ['80%'], []);
 
-    const handleSheetChanges = useCallback((index) => {
+    const handleSheetChanges = useCallback((index: number) => {
         console.log('handleSheetChanges', index);
     }, []);
 
@@ -290,6 +361,33 @@ const CardioTracker = () => {
                             value={duration}
                             onChangeText={setDuration}
                         />
+                        
+                        <View style={sheetStyles.dateTimeSection}>
+                            <Text style={sheetStyles.sectionLabel}>Date & Time (Optional)</Text>
+                            <View style={sheetStyles.dateTimeRow}>
+                                <View style={sheetStyles.dateTimeField}>
+                                    <Text style={sheetStyles.fieldLabel}>Date</Text>
+                                    <TextInput
+                                        style={sheetStyles.dateTimeInput}
+                                        placeholder="YYYY-MM-DD"
+                                        placeholderTextColor="#999"
+                                        value={selectedDate}
+                                        onChangeText={setSelectedDate}
+                                    />
+                                </View>
+                                <View style={sheetStyles.dateTimeField}>
+                                    <Text style={sheetStyles.fieldLabel}>Time</Text>
+                                    <TextInput
+                                        style={sheetStyles.dateTimeInput}
+                                        placeholder="HH:MM"
+                                        placeholderTextColor="#999"
+                                        value={selectedTime}
+                                        onChangeText={setSelectedTime}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+                        
                         <TouchableOpacity style={sheetStyles.addButton} onPress={onSubmitForm}>
                             <Text style={sheetStyles.addButtonText}>Log Session</Text>
                         </TouchableOpacity>
@@ -338,11 +436,39 @@ const CardioTracker = () => {
                     value={editDuration}
                     onChangeText={setEditDuration}
                 />
+                
+                <View style={sheetStyles.dateTimeSection}>
+                    <Text style={sheetStyles.sectionLabel}>Date & Time</Text>
+                    <View style={sheetStyles.dateTimeRow}>
+                        <View style={sheetStyles.dateTimeField}>
+                            <Text style={sheetStyles.fieldLabel}>Date</Text>
+                            <TextInput
+                                style={sheetStyles.dateTimeInput}
+                                placeholder="YYYY-MM-DD"
+                                placeholderTextColor="#999"
+                                value={editDate}
+                                onChangeText={setEditDate}
+                            />
+                        </View>
+                        <View style={sheetStyles.dateTimeField}>
+                            <Text style={sheetStyles.fieldLabel}>Time</Text>
+                            <TextInput
+                                style={sheetStyles.dateTimeInput}
+                                placeholder="HH:MM"
+                                placeholderTextColor="#999"
+                                value={editTime}
+                                onChangeText={setEditTime}
+                            />
+                        </View>
+                    </View>
+                </View>
+                
                 <TouchableOpacity style={sheetStyles.updateButton} onPress={updateCardio}>
                     <Text style={sheetStyles.updateButtonText}>Update Session</Text>
                 </TouchableOpacity>
             </BottomSheetView>
         </BottomSheet>
+
         </GestureHandlerRootView>
     )
 }
@@ -555,6 +681,40 @@ const sheetStyles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    dateTimeSection: {
+        marginTop: 20,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#ccc',
+    },
+    sectionLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        color: '#FFFFFF',
+    },
+    dateTimeRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    dateTimeField: {
+        flex: 1,
+    },
+    fieldLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 6,
+        color: '#4CAF50',
+    },
+    dateTimeInput: {
+        backgroundColor: '#1E1E1E',
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+        borderRadius: 6,
+        padding: 10,
+        fontSize: 14,
+        color: '#FFFFFF',
     },
 });
 

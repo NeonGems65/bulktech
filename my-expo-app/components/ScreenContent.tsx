@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Text, View, TouchableOpacity, StyleSheet } from 'react-native';
 
 import { EditScreenInfo } from './EditScreenInfo';
-import ListWorkout from './ListWorkouts';
 import InputWorkout from './InputWorkout';
 import CardioTracker from './CardioTracker';
 
