@@ -1,9 +1,10 @@
 import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { LineChart } from 'react-native-chart-kit';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
 
 type WorkoutEntry = {
@@ -66,11 +67,13 @@ const InputWorkout = () => {
     
     const [isOnline, setIsOnline] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
+    const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+    const [chartUnitMode, setChartUnitMode] = useState<'l' | 'k'>('l');
 
     const categories: Record<string, string[]> = {
-        Chest: ['Incline DB Bench Press', 'Chest Fly', 'Chest Press'],
-        Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Row Machine','Rear Delt Fly'],
-        Arms: ['Bayesian Curls', 'Cable Bar Curl', 'Preacher Curls',  'Tricep Extensions', 'Tricep Pulldown', 'Hammer Curls', 'Dips', "Forearm Cable Curls"],
+        Chest: ['Incline DB Bench Press', 'Chest Fly', 'Chest Press', 'Plate Chest Press'],
+        Back: ['Deadlift', 'Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Row Machine', 'Rear Delt Fly', 'Plate Row'],
+        Arms: ['Bayesian Curls', 'Cable Bar Curl', 'Preacher Curls', 'Tricep Extensions', 'Tricep Pulldown', 'Hammer Curls', 'Dips', 'Forearm Cable Curls', 'Shoulder Press', 'Cable Hammer Curls'],
         Legs: ['Leg Curls', 'Leg Press', 'Leg Extension', 'Calf Raises'],
         Core: ['Plank', 'Crunches', 'Leg Raises', 'Russian Twists']
     };
@@ -89,7 +92,7 @@ const InputWorkout = () => {
     
     const kilosWeights = useMemo(() => {
         const weights = [];
-        for (let i = 10; i <= 200; i += 10) {
+        for (let i = 5; i <= 200; i += 5) {
             weights.push(i);
         }
         return weights;
@@ -140,6 +143,78 @@ const InputWorkout = () => {
         }
 
         return 'Chest';
+    }
+
+    const parseWeightAndUnit = (weightString: string | null | undefined): { value: number; unit: 'lbs' | 'kg' } | null => {
+        if (!weightString || typeof weightString !== 'string') return null;
+
+        const trimmed = weightString.trim().toLowerCase();
+        const match = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|kgs|lb|lbs)$/);
+        if (!match) return null;
+
+        const value = parseFloat(match[1]);
+        const unit = match[2].startsWith('kg') ? 'kg' : 'lbs';
+
+        return { value, unit };
+    };
+
+    const convertWeight = (weight: { value: number; unit: 'lbs' | 'kg' }, targetUnit: 'lbs' | 'kg'): number => {
+        if (weight.unit === targetUnit) {
+            return weight.value;
+        }
+
+        if (weight.unit === 'kg' && targetUnit === 'lbs') {
+            return weight.value * 2.20462;
+        }
+
+        if (weight.unit === 'lbs' && targetUnit === 'kg') {
+            return weight.value / 2.20462;
+        }
+
+        return weight.value;
+    };
+
+    const getChartData = (latest: WorkoutEntry, history: WorkoutEntry[], unit: 'l' | 'k' = 'l') => {
+        const allWorkouts = [latest, ...history];
+        const targetUnit = unit === 'l' ? 'lbs' : 'kg';
+        
+        // Parse weights with units and convert to target unit
+        const weights = allWorkouts
+            .map(workout => {
+                if (!workout.weight) return null;
+                const parsed = parseWeightAndUnit(workout.weight);
+                if (!parsed) return null;
+                return convertWeight(parsed, targetUnit);
+            })
+            .reverse();
+
+        // Get labels (dates)
+        const labels = allWorkouts
+            .map(workout => {
+                const date = new Date(workout.created_at);
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+            })
+            .reverse();
+
+        // Filter out any null weights
+        const validWeights = weights.filter((w): w is number => w !== null);
+        
+        if (validWeights.length === 0) {
+            // Return empty chart data if no weights
+            return null;
+        }
+
+        // Round weights to 1 decimal place for display
+        const roundedWeights = validWeights.map(w => Math.round(w * 10) / 10);
+
+        return {
+            labels: labels.slice(-10), // Show last 10
+            datasets: [
+                {
+                    data: roundedWeights.slice(-10), // Show last 10
+                }
+            ]
+        };
     }
 
     const onAddDateChange = (_event: DateTimePickerEvent, date?: Date) => {
@@ -196,6 +271,104 @@ const InputWorkout = () => {
                 return nextDateTime;
             });
         }
+    };
+
+    const onWebDateChange = (value: string, isEdit: boolean) => {
+        const [year, month, day] = value.split('-').map(Number);
+        if (!year || !month || !day) return;
+
+        if (isEdit) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(year, month - 1, day);
+                return nextDateTime;
+            });
+            return;
+        }
+
+        setSelectedDateTime((prevDateTime) => {
+            const nextDateTime = new Date(prevDateTime);
+            nextDateTime.setFullYear(year, month - 1, day);
+            return nextDateTime;
+        });
+    };
+
+    const onWebTimeChange = (value: string, isEdit: boolean) => {
+        const [hours, minutes] = value.split(':').map(Number);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return;
+
+        if (isEdit) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(hours, minutes, 0, 0);
+                return nextDateTime;
+            });
+            return;
+        }
+
+        setSelectedDateTime((prevDateTime) => {
+            const nextDateTime = new Date(prevDateTime);
+            nextDateTime.setHours(hours, minutes, 0, 0);
+            return nextDateTime;
+        });
+    };
+
+    const openAddDatePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: selectedDateTime,
+                mode: 'date',
+                display: 'default',
+                onChange: onAddDateChange,
+            });
+            return;
+        }
+
+        setShowAddDatePicker(true);
+    };
+
+    const openAddTimePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: selectedDateTime,
+                mode: 'time',
+                display: 'default',
+                is24Hour: false,
+                onChange: onAddTimeChange,
+            });
+            return;
+        }
+
+        setShowAddTimePicker(true);
+    };
+
+    const openEditDatePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: editDateTime,
+                mode: 'date',
+                display: 'default',
+                onChange: onEditDateChange,
+            });
+            return;
+        }
+
+        setShowEditDatePicker(true);
+    };
+
+    const openEditTimePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: editDateTime,
+                mode: 'time',
+                display: 'default',
+                is24Hour: false,
+                onChange: onEditTimeChange,
+            });
+            return;
+        }
+
+        setShowEditTimePicker(true);
     };
 
     //delete function
@@ -361,28 +534,63 @@ const InputWorkout = () => {
         const editBottomSheetRef = useRef<any>(null);
 
   // variables
-  const snapPoints = useMemo(() => ['90%'], []);
+  const snapPoints = useMemo(() => {
+    if (Platform.OS === 'web') {
+      return ['90%'];
+    }
+    return ['100%'];
+  }, []);
 
   // callbacks
     const handleSheetChanges = useCallback((index: number) => {
     console.log('handleSheetChanges', index);
   }, []);
 
-    const groupedWorkouts = useMemo(() => {
-        const categoryOrder = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Other'];
-        const groups: Record<string, WorkoutEntry[]> = Object.fromEntries(
-            categoryOrder.map((category) => [category, [] as WorkoutEntry[]])
-        );
+    const toggleExpandWorkout = (workoutName: string) => {
+        const newExpanded = new Set(expandedWorkouts);
+        if (newExpanded.has(workoutName)) {
+            newExpanded.delete(workoutName);
+        } else {
+            newExpanded.add(workoutName);
+        }
+        setExpandedWorkouts(newExpanded);
+    };
 
+    const groupedWorkouts = useMemo(() => {
+        const groupsByName: Record<string, WorkoutEntry[]> = {};
+
+        // Group all workouts by name
         for (const workout of workouts) {
-            const category = getCategoryForWorkout(workout?.name);
-            if (!groups[category]) groups[category] = [];
-            groups[category].push(workout);
+            if (!groupsByName[workout.name]) {
+                groupsByName[workout.name] = [];
+            }
+            groupsByName[workout.name].push(workout);
         }
 
-        return categoryOrder
-            .map((category) => ({ category, workouts: groups[category] ?? [] }))
-            .filter((section) => section.workouts.length > 0);
+        // Sort each group by date (newest first)
+        for (const name in groupsByName) {
+            groupsByName[name].sort((a, b) => {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return dateB - dateA;
+            });
+        }
+
+        // Convert to array and sort by category, then name
+        return Object.entries(groupsByName)
+            .map(([name, entries]) => ({
+                name,
+                latest: entries[0],
+                history: entries.slice(1),
+                category: getCategoryForWorkout(name),
+            }))
+            .sort((a, b) => {
+                const categoryOrder = { 'Chest': 0, 'Back': 1, 'Arms': 2, 'Legs': 3, 'Core': 4, 'Other': 5 };
+                const categoryCompare = (categoryOrder[a.category as keyof typeof categoryOrder] ?? 999) -
+                                       (categoryOrder[b.category as keyof typeof categoryOrder] ?? 999);
+                if (categoryCompare !== 0) return categoryCompare;
+                return a.name.localeCompare(b.name);
+            });
     }, [workouts]);
 
     return (
@@ -427,37 +635,145 @@ const InputWorkout = () => {
                 <Text style={styles.headerText}>Workout</Text>
             </View>
             <ScrollView style={styles.scrollView}>
-            {groupedWorkouts.map((section) => (
-                <View key={section.category} style={styles.sectionContainer}>
-                    <Text style={styles.sectionHeader}>{section.category}</Text>
-
-                    {section.workouts.map((workout) => (
-                        <View key={workout.workout_id} style={styles.row}>
-                            <View style={styles.workoutInfo}>
-                                <Text style={styles.rowText}>{workout.name}</Text>
-                                {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
-                                {workout.created_at ? (
-                                    <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
-                                ) : null}
-                            </View>
-
-                            <View style={styles.rowActions}>
-                                <TouchableOpacity
-                                    style={styles.editButton}
-                                    onPress={() => openEditSheet(workout)}
-                                >
-                                    <Text style={styles.editButtonText}>Edit</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.deleteButton}
-                                    onPress={() => deleteWorkout(workout.workout_id)}
-                                >
-                                    <Text style={styles.deleteButtonText}>Delete</Text>
-                                </TouchableOpacity>
-                            </View>
+            {groupedWorkouts.map((workoutGroup) => (
+                <View key={workoutGroup.name} style={styles.sectionContainer}>
+                    {/* Latest Workout Entry */}
+                    <View style={styles.row}>
+                        <View style={styles.workoutInfo}>
+                            <Text style={styles.rowText}>{workoutGroup.latest.name}</Text>
+                            {workoutGroup.latest.weight ? <Text style={styles.weightText}>{workoutGroup.latest.weight}</Text> : null}
+                            {workoutGroup.latest.created_at ? (
+                                <Text style={styles.dateText}>{formatDateTime(workoutGroup.latest.created_at)}</Text>
+                            ) : null}
+                            {workoutGroup.history.length > 0 && (
+                                <View style={styles.latestBadge}>
+                                    <Text style={styles.latestBadgeText}>Latest</Text>
+                                </View>
+                            )}
                         </View>
-                    ))}
+
+                        <View style={styles.rowActions}>
+                            {workoutGroup.history.length > 0 && (
+                                <TouchableOpacity
+                                    style={[styles.historyButton, expandedWorkouts.has(workoutGroup.name) && styles.historyButtonActive]}
+                                    onPress={() => toggleExpandWorkout(workoutGroup.name)}
+                                >
+                                    <Text style={styles.historyButtonText}>{expandedWorkouts.has(workoutGroup.name) ? '▼' : '▶'}</Text>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                                style={styles.editButton}
+                                onPress={() => openEditSheet(workoutGroup.latest)}
+                            >
+                                <Text style={styles.editButtonText}>Edit</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => deleteWorkout(workoutGroup.latest.workout_id)}
+                            >
+                                <Text style={styles.deleteButtonText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* History Entries */}
+                    {expandedWorkouts.has(workoutGroup.name) && workoutGroup.history.length > 0 && (
+                        <View>
+                            {/* Progression Chart */}
+                            {getChartData(workoutGroup.latest, workoutGroup.history, chartUnitMode) && (
+                                <View style={styles.chartContainer}>
+                                    <View style={styles.chartHeaderRow}>
+                                        <Text style={styles.chartTitle}>Progression</Text>
+                                        <View style={styles.chartUnitToggle}>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.chartUnitButton,
+                                                    chartUnitMode === 'l' && styles.chartUnitButtonActive,
+                                                ]}
+                                                onPress={() => setChartUnitMode('l')}
+                                            >
+                                                <Text style={[
+                                                    styles.chartUnitButtonText,
+                                                    chartUnitMode === 'l' && styles.chartUnitButtonTextActive,
+                                                ]}>Lbs</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.chartUnitButton,
+                                                    chartUnitMode === 'k' && styles.chartUnitButtonActive,
+                                                ]}
+                                                onPress={() => setChartUnitMode('k')}
+                                            >
+                                                <Text style={[
+                                                    styles.chartUnitButtonText,
+                                                    chartUnitMode === 'k' && styles.chartUnitButtonTextActive,
+                                                ]}>Kg</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                    <LineChart
+                                        data={getChartData(workoutGroup.latest, workoutGroup.history, chartUnitMode)!}
+                                        width={Dimensions.get('window').width - 60}
+                                        height={220}
+                                        chartConfig={{
+                                            backgroundColor: '#1E1E1E',
+                                            backgroundGradientFrom: '#1E1E1E',
+                                            backgroundGradientTo: '#000000',
+                                            color: (opacity = 1) => `rgba(211, 47, 47, ${opacity})`,
+                                            strokeWidth: 2,
+                                            propsForDots: {
+                                                r: '5',
+                                                strokeWidth: '2',
+                                                stroke: '#D32F2F',
+                                            },
+                                            propsForLabels: {
+                                                fontSize: 12,
+                                                fill: '#999999',
+                                            },
+                                            propsForBackgroundLines: {
+                                                strokeDasharray: '5',
+                                                stroke: '#333333',
+                                            },
+                                        }}
+                                        style={{
+                                            borderRadius: 8,
+                                            marginVertical: 10,
+                                        }}
+                                        bezier
+                                    />
+                                </View>
+                            )}
+                            
+                            {workoutGroup.history.map((workout) => (
+                                <View key={workout.workout_id} style={[styles.row, styles.historyRow]}>
+                                    <View style={styles.workoutInfo}>
+                                        <Text style={[styles.rowText, styles.historyRowText]}>{workout.name}</Text>
+                                        {workout.weight ? <Text style={styles.weightText}>{workout.weight}</Text> : null}
+                                        {workout.created_at ? (
+                                            <Text style={styles.dateText}>{formatDateTime(workout.created_at)}</Text>
+                                        ) : null}
+                                    </View>
+
+                                    <View style={styles.rowActions}>
+                                        <TouchableOpacity
+                                            style={styles.editButton}
+                                            onPress={() => openEditSheet(workout)}
+                                        >
+                                            <Text style={styles.editButtonText}>Edit</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.deleteButton}
+                                            onPress={() => deleteWorkout(workout.workout_id)}
+                                        >
+                                            <Text style={styles.deleteButtonText}>Delete</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
             ))}
             </ScrollView>
@@ -558,13 +874,31 @@ const InputWorkout = () => {
                                 <Text style={bottomSheetStyles.sectionLabel}>Date & Time (Optional)</Text>
                                 <View style={bottomSheetStyles.dateTimeField}>
                                     <Text style={bottomSheetStyles.fieldLabel}>Date</Text>
-                                    <TouchableOpacity
-                                        style={bottomSheetStyles.dateTimeInput}
-                                        onPress={() => setShowAddDatePicker(true)}
-                                    >
-                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(selectedDateTime)}</Text>
-                                    </TouchableOpacity>
-                                    {showAddDatePicker ? (
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="date"
+                                            value={formatDateInputValue(selectedDateTime)}
+                                            onChange={(event) => onWebDateChange(event.target.value, false)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #D32F2F',
+                                                padding: '10px',
+                                                backgroundColor: '#f5f5f5',
+                                                color: '#333',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={bottomSheetStyles.dateTimeInput}
+                                            onPress={openAddDatePicker}
+                                        >
+                                            <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(selectedDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showAddDatePicker ? (
                                         <DateTimePicker
                                             value={selectedDateTime}
                                             mode="date"
@@ -575,13 +909,31 @@ const InputWorkout = () => {
                                 </View>
                                 <View style={bottomSheetStyles.dateTimeField}>
                                     <Text style={bottomSheetStyles.fieldLabel}>Time</Text>
-                                    <TouchableOpacity
-                                        style={bottomSheetStyles.dateTimeInput}
-                                        onPress={() => setShowAddTimePicker(true)}
-                                    >
-                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(selectedDateTime)}</Text>
-                                    </TouchableOpacity>
-                                    {showAddTimePicker ? (
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="time"
+                                            value={formatTimeInputValue(selectedDateTime)}
+                                            onChange={(event) => onWebTimeChange(event.target.value, false)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #D32F2F',
+                                                padding: '10px',
+                                                backgroundColor: '#f5f5f5',
+                                                color: '#333',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={bottomSheetStyles.dateTimeInput}
+                                            onPress={openAddTimePicker}
+                                        >
+                                            <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(selectedDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showAddTimePicker ? (
                                         <DateTimePicker
                                             value={selectedDateTime}
                                             mode="time"
@@ -698,13 +1050,31 @@ const InputWorkout = () => {
                                 <Text style={bottomSheetStyles.sectionLabel}>Date & Time</Text>
                                 <View style={bottomSheetStyles.dateTimeField}>
                                     <Text style={bottomSheetStyles.fieldLabel}>Date</Text>
-                                    <TouchableOpacity
-                                        style={bottomSheetStyles.dateTimeInput}
-                                        onPress={() => setShowEditDatePicker(true)}
-                                    >
-                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(editDateTime)}</Text>
-                                    </TouchableOpacity>
-                                    {showEditDatePicker ? (
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="date"
+                                            value={formatDateInputValue(editDateTime)}
+                                            onChange={(event) => onWebDateChange(event.target.value, true)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #D32F2F',
+                                                padding: '10px',
+                                                backgroundColor: '#f5f5f5',
+                                                color: '#333',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={bottomSheetStyles.dateTimeInput}
+                                            onPress={openEditDatePicker}
+                                        >
+                                            <Text style={bottomSheetStyles.dateTimeInputText}>{formatDateInputValue(editDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showEditDatePicker ? (
                                         <DateTimePicker
                                             value={editDateTime}
                                             mode="date"
@@ -715,13 +1085,31 @@ const InputWorkout = () => {
                                 </View>
                                 <View style={bottomSheetStyles.dateTimeField}>
                                     <Text style={bottomSheetStyles.fieldLabel}>Time</Text>
-                                    <TouchableOpacity
-                                        style={bottomSheetStyles.dateTimeInput}
-                                        onPress={() => setShowEditTimePicker(true)}
-                                    >
-                                        <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(editDateTime)}</Text>
-                                    </TouchableOpacity>
-                                    {showEditTimePicker ? (
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="time"
+                                            value={formatTimeInputValue(editDateTime)}
+                                            onChange={(event) => onWebTimeChange(event.target.value, true)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #D32F2F',
+                                                padding: '10px',
+                                                backgroundColor: '#f5f5f5',
+                                                color: '#333',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={bottomSheetStyles.dateTimeInput}
+                                            onPress={openEditTimePicker}
+                                        >
+                                            <Text style={bottomSheetStyles.dateTimeInputText}>{formatTimeInputValue(editDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showEditTimePicker ? (
                                         <DateTimePicker
                                             value={editDateTime}
                                             mode="time"
@@ -865,6 +1253,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
+    latestBadge: {
+        backgroundColor: '#D32F2F',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+        marginVertical: 6,
+        alignSelf: 'flex-start',
+    },
+    latestBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
     weightText: {
         color: '#CCCCCC',
         fontSize: 14,
@@ -902,6 +1304,79 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 11,
         fontWeight: 'bold',
+    },
+    historyButton: {
+        backgroundColor: '#666666',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 5,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    historyButtonActive: {
+        backgroundColor: '#555555',
+    },
+    historyButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    historyRow: {
+        backgroundColor: '#151515',
+        marginLeft: 10,
+        marginRight: 0,
+        borderLeftWidth: 3,
+        borderLeftColor: '#D32F2F',
+        paddingLeft: 12,
+    },
+    historyRowText: {
+        fontSize: 14,
+        color: '#E0E0E0',
+    },
+    chartContainer: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 8,
+        padding: 15,
+        marginVertical: 10,
+        marginLeft: 10,
+        marginRight: 0,
+        borderLeftWidth: 3,
+        borderLeftColor: '#D32F2F',
+    },
+    chartHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    chartTitle: {
+        color: '#D32F2F',
+        fontSize: 14,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    chartUnitToggle: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    chartUnitButton: {
+        borderWidth: 1,
+        borderColor: '#D32F2F',
+        borderRadius: 5,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#000000',
+    },
+    chartUnitButtonActive: {
+        backgroundColor: '#D32F2F',
+    },
+    chartUnitButtonText: {
+        color: '#D32F2F',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    chartUnitButtonTextActive: {
+        color: '#FFFFFF',
     },
 });
 

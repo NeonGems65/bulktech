@@ -32,11 +32,11 @@ app.get('/health', (_req, res) => {
 app.post("/workoutlist", async(req,res) =>{
     try{
 
-       const { name, weight } = req.body;
-       console.log("Adding workout:", name, weight);
+             const { name, weight, created_at } = req.body;
+             console.log("Adding workout:", name, weight, created_at);
        const newWorkout = await pool.query(
-         "INSERT INTO workoutlist (name, weight) VALUES($1, $2) RETURNING *",
-         [name, weight]
+                 "INSERT INTO workoutlist (name, weight, created_at) VALUES($1, $2, $3) RETURNING *",
+                 [name, weight, created_at || new Date()]
        );
 
       res.json(newWorkout.rows[0]);
