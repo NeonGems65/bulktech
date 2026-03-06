@@ -113,11 +113,11 @@ app.delete('/workoutlist/:id', async(req,res) => {
 // Create a cardio entry
 app.post("/cardiolist", async(req,res) => {
     try{
-        const { name, duration_minutes } = req.body;
-        console.log("Adding cardio:", name, duration_minutes);
+        const { name, duration_minutes, created_at } = req.body;
+        console.log("Adding cardio:", name, duration_minutes, created_at);
         const newCardio = await pool.query(
-            "INSERT INTO cardiolist (name, duration_minutes) VALUES($1, $2) RETURNING *",
-            [name, duration_minutes]
+            "INSERT INTO cardiolist (name, duration_minutes, created_at) VALUES($1, $2, $3) RETURNING *",
+            [name, duration_minutes, created_at || new Date()]
         );
         res.json(newCardio.rows[0]);
     } catch(err) {

@@ -1,8 +1,10 @@
 import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, DeviceEventEmitter, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { LineChart } from 'react-native-chart-kit';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
 import { getCachedCardio, cacheCardio, clearCardioCache } from '../utils/cardioCache';
 
@@ -40,18 +42,21 @@ const CardioTracker = () => {
 
     const [selectedCardio, setSelectedCardio] = useState<string | null>(null);
     const [duration, setDuration] = useState("");
-    const [selectedDate, setSelectedDate] = useState("");
-    const [selectedTime, setSelectedTime] = useState("");
+    const [selectedDateTime, setSelectedDateTime] = useState(new Date());
+    const [showAddDatePicker, setShowAddDatePicker] = useState(false);
+    const [showAddTimePicker, setShowAddTimePicker] = useState(false);
     const [cardioList, setCardioList] = useState<CardioEntry[]>([]);
     
     const [editingCardio, setEditingCardio] = useState<CardioEntry | null>(null);
     const [editSelectedCardio, setEditSelectedCardio] = useState<string | null>(null);
     const [editDuration, setEditDuration] = useState("");
-    const [editDate, setEditDate] = useState("");
-    const [editTime, setEditTime] = useState("");
+    const [editDateTime, setEditDateTime] = useState(new Date());
+    const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+    const [showEditTimePicker, setShowEditTimePicker] = useState(false);
 
     const [isOnline, setIsOnline] = useState(true);
     const [apiUnavailable, setApiUnavailable] = useState(false);
+    const [expandedCardio, setExpandedCardio] = useState<Set<string>>(new Set());
 
     const cardioOptions = [
         'Treadmill',
@@ -69,6 +74,168 @@ const CardioTracker = () => {
     const statusBannerMessage = !isOnline
         ? 'You are offline. Reconnect to sync cardio.'
         : 'Server unavailable right now. Retrying soon.';
+
+    const formatDateInputValue = (date: Date) => {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+
+    const formatTimeInputValue = (date: Date) => {
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    };
+
+    const onAddDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowAddDatePicker(false);
+        }
+
+        if (date) {
+            setSelectedDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onAddTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowAddTimePicker(false);
+        }
+
+        if (date) {
+            setSelectedDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onEditDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowEditDatePicker(false);
+        }
+
+        if (date) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onEditTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowEditTimePicker(false);
+        }
+
+        if (date) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                return nextDateTime;
+            });
+        }
+    };
+
+    const onWebDateChange = (value: string, isEdit: boolean) => {
+        const [year, month, day] = value.split('-').map(Number);
+        if (!year || !month || !day) return;
+
+        if (isEdit) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setFullYear(year, month - 1, day);
+                return nextDateTime;
+            });
+            return;
+        }
+
+        setSelectedDateTime((prevDateTime) => {
+            const nextDateTime = new Date(prevDateTime);
+            nextDateTime.setFullYear(year, month - 1, day);
+            return nextDateTime;
+        });
+    };
+
+    const onWebTimeChange = (value: string, isEdit: boolean) => {
+        const [hours, minutes] = value.split(':').map(Number);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return;
+
+        if (isEdit) {
+            setEditDateTime((prevDateTime) => {
+                const nextDateTime = new Date(prevDateTime);
+                nextDateTime.setHours(hours, minutes, 0, 0);
+                return nextDateTime;
+            });
+            return;
+        }
+
+        setSelectedDateTime((prevDateTime) => {
+            const nextDateTime = new Date(prevDateTime);
+            nextDateTime.setHours(hours, minutes, 0, 0);
+            return nextDateTime;
+        });
+    };
+
+    const openAddDatePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: selectedDateTime,
+                mode: 'date',
+                display: 'default',
+                onChange: onAddDateChange,
+            });
+            return;
+        }
+
+        setShowAddDatePicker(true);
+    };
+
+    const openAddTimePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: selectedDateTime,
+                mode: 'time',
+                display: 'default',
+                is24Hour: false,
+                onChange: onAddTimeChange,
+            });
+            return;
+        }
+
+        setShowAddTimePicker(true);
+    };
+
+    const openEditDatePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: editDateTime,
+                mode: 'date',
+                display: 'default',
+                onChange: onEditDateChange,
+            });
+            return;
+        }
+
+        setShowEditDatePicker(true);
+    };
+
+    const openEditTimePicker = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: editDateTime,
+                mode: 'time',
+                display: 'default',
+                is24Hour: false,
+                onChange: onEditTimeChange,
+            });
+            return;
+        }
+
+        setShowEditTimePicker(true);
+    };
 
     // Delete cardio entry
     const deleteCardio = async (id: number) => {
@@ -97,14 +264,7 @@ const CardioTracker = () => {
         if (!editingCardio) return;
 
         try {
-            // Parse date/time if provided
-            let created_at = editingCardio.created_at;
-            if (editDate && editTime) {
-                const [year, month, day] = editDate.split('-').map(Number);
-                const [hours, minutes] = editTime.split(':').map(Number);
-                const newDateTime = new Date(year, month - 1, day, hours, minutes);
-                created_at = newDateTime.toISOString();
-            }
+            const created_at = editDateTime.toISOString();
             
             const body = { name: editSelectedCardio, duration_minutes: parseInt(editDuration), created_at };
 
@@ -122,8 +282,9 @@ const CardioTracker = () => {
             setEditingCardio(null);
             setEditSelectedCardio(null);
             setEditDuration("");
-            setEditDate("");
-            setEditTime("");
+            setEditDateTime(new Date());
+            setShowEditDatePicker(false);
+            setShowEditTimePicker(false);
             editBottomSheetRef.current?.close();
             // Clear cache after update so fresh data is fetched
             await clearCardioCache();
@@ -139,13 +300,11 @@ const CardioTracker = () => {
         setEditingCardio(cardio);
         setEditSelectedCardio(cardio?.name ?? "");
         setEditDuration(cardio?.duration_minutes?.toString() ?? "");
-        
-        // Set date and time
-        const date = new Date(cardio.created_at);
-        const dateStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-        const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
-        setEditDate(dateStr);
-        setEditTime(timeStr);
+
+        const cardioDate = new Date(cardio.created_at);
+        setEditDateTime(Number.isNaN(cardioDate.getTime()) ? new Date() : cardioDate);
+        setShowEditDatePicker(false);
+        setShowEditTimePicker(false);
         
         editBottomSheetRef.current?.expand();
     }
@@ -219,14 +378,7 @@ const CardioTracker = () => {
         try{
             console.log("Submitting cardio...");
             
-            // Parse date/time if provided, otherwise use current time
-            let created_at = new Date().toISOString();
-            if (selectedDate && selectedTime) {
-                const [year, month, day] = selectedDate.split('-').map(Number);
-                const [hours, minutes] = selectedTime.split(':').map(Number);
-                const newDateTime = new Date(year, month - 1, day, hours, minutes);
-                created_at = newDateTime.toISOString();
-            }
+            const created_at = selectedDateTime.toISOString();
             
             const body = { name: selectedCardio, duration_minutes: parseInt(duration), created_at }
             const response = await fetch(`${baseUrl}/cardiolist`, {
@@ -242,8 +394,9 @@ const CardioTracker = () => {
             setApiUnavailable(false);
             setSelectedCardio(null);
             setDuration("");
-            setSelectedDate("");
-            setSelectedTime("");
+            setSelectedDateTime(new Date());
+            setShowAddDatePicker(false);
+            setShowAddTimePicker(false);
             bottomSheetRef.current?.close();
             // Clear cache after adding new cardio so fresh data is fetched
             await clearCardioCache();
@@ -257,11 +410,72 @@ const CardioTracker = () => {
 
     const bottomSheetRef = useRef<any>(null);
     const editBottomSheetRef = useRef<any>(null);
-    const snapPoints = useMemo(() => ['80%'], []);
+    const snapPoints = useMemo(() => {
+        if (Platform.OS === 'web') {
+            return ['90%'];
+        }
+        return ['100%'];
+    }, []);
 
     const handleSheetChanges = useCallback((index: number) => {
         console.log('handleSheetChanges', index);
     }, []);
+
+    const toggleExpandCardio = (cardioName: string) => {
+        const nextExpanded = new Set(expandedCardio);
+        if (nextExpanded.has(cardioName)) {
+            nextExpanded.delete(cardioName);
+        } else {
+            nextExpanded.add(cardioName);
+        }
+        setExpandedCardio(nextExpanded);
+    };
+
+    const groupedCardio = useMemo(() => {
+        const groupsByName: Record<string, CardioEntry[]> = {};
+
+        for (const entry of cardioList) {
+            if (!groupsByName[entry.name]) {
+                groupsByName[entry.name] = [];
+            }
+            groupsByName[entry.name].push(entry);
+        }
+
+        for (const name in groupsByName) {
+            groupsByName[name].sort((a, b) => {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return dateB - dateA;
+            });
+        }
+
+        return Object.entries(groupsByName)
+            .map(([name, entries]) => ({
+                name,
+                latest: entries[0],
+                history: entries.slice(1),
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [cardioList]);
+
+    const getCardioChartData = (latest: CardioEntry, history: CardioEntry[]) => {
+        const allEntries = [...history, latest];
+        const lastTen = allEntries.slice(-10);
+
+        const labels = lastTen.map((entry) => {
+            const date = new Date(entry.created_at);
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        });
+
+        const data = lastTen.map((entry) => entry.duration_minutes);
+
+        if (data.length === 0) return null;
+
+        return {
+            labels,
+            datasets: [{ data }],
+        };
+    };
 
     return (
         <GestureHandlerRootView style={styles.container}>
@@ -287,31 +501,114 @@ const CardioTracker = () => {
             {cardioList.length === 0 ? (
                 <Text style={styles.emptyText}>No cardio sessions yet. Start tracking!</Text>
             ) : (
-                cardioList.map((cardio) => (
-                    <View key={cardio.cardio_id} style={styles.row}>
-                        <View style={styles.cardioInfo}>
-                            <Text style={styles.rowText}>{cardio.name}</Text>
-                            <Text style={styles.durationText}>{cardio.duration_minutes} minutes</Text>
-                            {cardio.created_at ? (
-                                <Text style={styles.dateText}>{formatDateTime(cardio.created_at)}</Text>
-                            ) : null}
+                groupedCardio.map((cardioGroup) => (
+                    <View key={cardioGroup.name} style={styles.sectionContainer}>
+                        <View style={styles.row}>
+                            <View style={styles.cardioInfo}>
+                                <Text style={styles.rowText}>{cardioGroup.latest.name}</Text>
+                                <Text style={styles.durationText}>{cardioGroup.latest.duration_minutes} minutes</Text>
+                                {cardioGroup.latest.created_at ? (
+                                    <Text style={styles.dateText}>{formatDateTime(cardioGroup.latest.created_at)}</Text>
+                                ) : null}
+                                {cardioGroup.history.length > 0 && (
+                                    <View style={styles.latestBadge}>
+                                        <Text style={styles.latestBadgeText}>Latest</Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.rowActions}>
+                                {cardioGroup.history.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.historyButton, expandedCardio.has(cardioGroup.name) && styles.historyButtonActive]}
+                                        onPress={() => toggleExpandCardio(cardioGroup.name)}
+                                    >
+                                        <Text style={styles.historyButtonText}>{expandedCardio.has(cardioGroup.name) ? '▼' : '▶'}</Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    style={styles.editButton}
+                                    onPress={() => openEditSheet(cardioGroup.latest)}
+                                >
+                                    <Text style={styles.editButtonText}>Edit</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => deleteCardio(cardioGroup.latest.cardio_id)}
+                                >
+                                    <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <View style={styles.rowActions}>
-                            <TouchableOpacity
-                                style={styles.editButton}
-                                onPress={() => openEditSheet(cardio)}
-                            >
-                                <Text style={styles.editButtonText}>Edit</Text>
-                            </TouchableOpacity>
+                        {expandedCardio.has(cardioGroup.name) && cardioGroup.history.length > 0 && (
+                            <View>
+                                {getCardioChartData(cardioGroup.latest, cardioGroup.history) && (
+                                    <View style={styles.chartContainer}>
+                                        <Text style={styles.chartTitle}>Duration Progression</Text>
+                                        <LineChart
+                                            data={getCardioChartData(cardioGroup.latest, cardioGroup.history)!}
+                                            width={Dimensions.get('window').width - 60}
+                                            height={220}
+                                            chartConfig={{
+                                                backgroundColor: '#1E1E1E',
+                                                backgroundGradientFrom: '#1E1E1E',
+                                                backgroundGradientTo: '#000000',
+                                                color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+                                                strokeWidth: 2,
+                                                propsForDots: {
+                                                    r: '5',
+                                                    strokeWidth: '2',
+                                                    stroke: '#4CAF50',
+                                                },
+                                                propsForLabels: {
+                                                    fontSize: 12,
+                                                    fill: '#999999',
+                                                },
+                                                propsForBackgroundLines: {
+                                                    strokeDasharray: '5',
+                                                    stroke: '#333333',
+                                                },
+                                            }}
+                                            style={{
+                                                borderRadius: 8,
+                                                marginVertical: 10,
+                                            }}
+                                            bezier
+                                        />
+                                    </View>
+                                )}
 
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={() => deleteCardio(cardio.cardio_id)}
-                            >
-                                <Text style={styles.deleteButtonText}>Delete</Text>
-                            </TouchableOpacity>
-                        </View>
+                                {cardioGroup.history.map((entry) => (
+                                    <View key={entry.cardio_id} style={[styles.row, styles.historyRow]}>
+                                        <View style={styles.cardioInfo}>
+                                            <Text style={[styles.rowText, styles.historyRowText]}>{entry.name}</Text>
+                                            <Text style={styles.durationText}>{entry.duration_minutes} minutes</Text>
+                                            {entry.created_at ? (
+                                                <Text style={styles.dateText}>{formatDateTime(entry.created_at)}</Text>
+                                            ) : null}
+                                        </View>
+
+                                        <View style={styles.rowActions}>
+                                            <TouchableOpacity
+                                                style={styles.editButton}
+                                                onPress={() => openEditSheet(entry)}
+                                            >
+                                                <Text style={styles.editButtonText}>Edit</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={styles.deleteButton}
+                                                onPress={() => deleteCardio(entry.cardio_id)}
+                                            >
+                                                <Text style={styles.deleteButtonText}>Delete</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
                     </View>
                 ))
             )}
@@ -367,23 +664,73 @@ const CardioTracker = () => {
                             <View style={sheetStyles.dateTimeRow}>
                                 <View style={sheetStyles.dateTimeField}>
                                     <Text style={sheetStyles.fieldLabel}>Date</Text>
-                                    <TextInput
-                                        style={sheetStyles.dateTimeInput}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor="#999"
-                                        value={selectedDate}
-                                        onChangeText={setSelectedDate}
-                                    />
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="date"
+                                            value={formatDateInputValue(selectedDateTime)}
+                                            onChange={(event) => onWebDateChange(event.target.value, false)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #4CAF50',
+                                                padding: '10px',
+                                                backgroundColor: '#1E1E1E',
+                                                color: '#FFFFFF',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={sheetStyles.dateTimeInput}
+                                            onPress={openAddDatePicker}
+                                        >
+                                            <Text style={sheetStyles.dateTimeInputText}>{formatDateInputValue(selectedDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showAddDatePicker ? (
+                                        <DateTimePicker
+                                            value={selectedDateTime}
+                                            mode="date"
+                                            display="default"
+                                            onChange={onAddDateChange}
+                                        />
+                                    ) : null}
                                 </View>
                                 <View style={sheetStyles.dateTimeField}>
                                     <Text style={sheetStyles.fieldLabel}>Time</Text>
-                                    <TextInput
-                                        style={sheetStyles.dateTimeInput}
-                                        placeholder="HH:MM"
-                                        placeholderTextColor="#999"
-                                        value={selectedTime}
-                                        onChangeText={setSelectedTime}
-                                    />
+                                    {Platform.OS === 'web' ? (
+                                        <input
+                                            type="time"
+                                            value={formatTimeInputValue(selectedDateTime)}
+                                            onChange={(event) => onWebTimeChange(event.target.value, false)}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: 42,
+                                                borderRadius: 6,
+                                                border: '1px solid #4CAF50',
+                                                padding: '10px',
+                                                backgroundColor: '#1E1E1E',
+                                                color: '#FFFFFF',
+                                                fontSize: '14px',
+                                            }}
+                                        />
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={sheetStyles.dateTimeInput}
+                                            onPress={openAddTimePicker}
+                                        >
+                                            <Text style={sheetStyles.dateTimeInputText}>{formatTimeInputValue(selectedDateTime)}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {Platform.OS === 'ios' && showAddTimePicker ? (
+                                        <DateTimePicker
+                                            value={selectedDateTime}
+                                            mode="time"
+                                            display="default"
+                                            onChange={onAddTimeChange}
+                                        />
+                                    ) : null}
                                 </View>
                             </View>
                         </View>
@@ -442,23 +789,73 @@ const CardioTracker = () => {
                     <View style={sheetStyles.dateTimeRow}>
                         <View style={sheetStyles.dateTimeField}>
                             <Text style={sheetStyles.fieldLabel}>Date</Text>
-                            <TextInput
-                                style={sheetStyles.dateTimeInput}
-                                placeholder="YYYY-MM-DD"
-                                placeholderTextColor="#999"
-                                value={editDate}
-                                onChangeText={setEditDate}
-                            />
+                            {Platform.OS === 'web' ? (
+                                <input
+                                    type="date"
+                                    value={formatDateInputValue(editDateTime)}
+                                    onChange={(event) => onWebDateChange(event.target.value, true)}
+                                    style={{
+                                        width: '100%',
+                                        minHeight: 42,
+                                        borderRadius: 6,
+                                        border: '1px solid #4CAF50',
+                                        padding: '10px',
+                                        backgroundColor: '#1E1E1E',
+                                        color: '#FFFFFF',
+                                        fontSize: '14px',
+                                    }}
+                                />
+                            ) : (
+                                <TouchableOpacity
+                                    style={sheetStyles.dateTimeInput}
+                                    onPress={openEditDatePicker}
+                                >
+                                    <Text style={sheetStyles.dateTimeInputText}>{formatDateInputValue(editDateTime)}</Text>
+                                </TouchableOpacity>
+                            )}
+                            {Platform.OS === 'ios' && showEditDatePicker ? (
+                                <DateTimePicker
+                                    value={editDateTime}
+                                    mode="date"
+                                    display="default"
+                                    onChange={onEditDateChange}
+                                />
+                            ) : null}
                         </View>
                         <View style={sheetStyles.dateTimeField}>
                             <Text style={sheetStyles.fieldLabel}>Time</Text>
-                            <TextInput
-                                style={sheetStyles.dateTimeInput}
-                                placeholder="HH:MM"
-                                placeholderTextColor="#999"
-                                value={editTime}
-                                onChangeText={setEditTime}
-                            />
+                            {Platform.OS === 'web' ? (
+                                <input
+                                    type="time"
+                                    value={formatTimeInputValue(editDateTime)}
+                                    onChange={(event) => onWebTimeChange(event.target.value, true)}
+                                    style={{
+                                        width: '100%',
+                                        minHeight: 42,
+                                        borderRadius: 6,
+                                        border: '1px solid #4CAF50',
+                                        padding: '10px',
+                                        backgroundColor: '#1E1E1E',
+                                        color: '#FFFFFF',
+                                        fontSize: '14px',
+                                    }}
+                                />
+                            ) : (
+                                <TouchableOpacity
+                                    style={sheetStyles.dateTimeInput}
+                                    onPress={openEditTimePicker}
+                                >
+                                    <Text style={sheetStyles.dateTimeInputText}>{formatTimeInputValue(editDateTime)}</Text>
+                                </TouchableOpacity>
+                            )}
+                            {Platform.OS === 'ios' && showEditTimePicker ? (
+                                <DateTimePicker
+                                    value={editDateTime}
+                                    mode="time"
+                                    display="default"
+                                    onChange={onEditTimeChange}
+                                />
+                            ) : null}
                         </View>
                     </View>
                 </View>
@@ -549,6 +946,9 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 40,
     },
+    sectionContainer: {
+        marginBottom: 14,
+    },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -580,8 +980,9 @@ const styles = StyleSheet.create({
     rowActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 6,
         marginLeft: 10,
+        flexWrap: 'wrap',
     },
     editButton: {
         backgroundColor: '#555555',
@@ -604,6 +1005,65 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    historyButton: {
+        backgroundColor: '#666666',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 5,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    historyButtonActive: {
+        backgroundColor: '#555555',
+    },
+    historyButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    latestBadge: {
+        backgroundColor: '#4CAF50',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+    },
+    latestBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    historyRow: {
+        backgroundColor: '#151515',
+        marginLeft: 10,
+        marginRight: 0,
+        borderLeftWidth: 3,
+        borderLeftColor: '#4CAF50',
+        paddingLeft: 12,
+    },
+    historyRowText: {
+        fontSize: 14,
+        color: '#E0E0E0',
+    },
+    chartContainer: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 8,
+        padding: 15,
+        marginVertical: 10,
+        marginLeft: 10,
+        marginRight: 0,
+        borderLeftWidth: 3,
+        borderLeftColor: '#4CAF50',
+    },
+    chartTitle: {
+        color: '#4CAF50',
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textTransform: 'uppercase',
     },
 });
 
@@ -713,8 +1173,15 @@ const sheetStyles = StyleSheet.create({
         borderColor: '#4CAF50',
         borderRadius: 6,
         padding: 10,
+        minHeight: 42,
+        justifyContent: 'center',
         fontSize: 14,
         color: '#FFFFFF',
+    },
+    dateTimeInputText: {
+        fontSize: 14,
+        color: '#FFFFFF',
+        fontWeight: '500',
     },
 });
 
