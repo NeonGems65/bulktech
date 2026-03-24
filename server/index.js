@@ -5,9 +5,25 @@ const app = express();
 const cors = require('cors');
 const pool = require('./db');
 
+function isWriteLockEnabled() {
+    const raw = String(process.env.MAINTENANCE_WRITE_LOCK || '').trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
 //middleware to parse JSON bodies
 app.use(cors())
 app.use(express.json());
+
+app.use((req, res, next) => {
+    const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+    if (isWriteLockEnabled() && writeMethods.has(req.method)) {
+        return res.status(503).json({
+            error: 'Write operations are temporarily disabled for maintenance.',
+            code: 'MAINTENANCE_WRITE_LOCK',
+        });
+    }
+    return next();
+});
 
 app.get('/', (_req, res) => {
     res.json({
@@ -18,7 +34,7 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-    res.json({ ok: true });
+    res.json({ ok: true, maintenanceWriteLock: isWriteLockEnabled() });
 });
 
 

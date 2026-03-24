@@ -8,6 +8,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "preflight:phase1": "node scripts/phase1-preflight.js",
+    "preflight:phase2": "node scripts/phase2-source-backup.js",
+    "preflight:phase3": "node scripts/phase3-neon-prep.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
