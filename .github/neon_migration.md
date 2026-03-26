@@ -156,3 +156,77 @@ Phase 3 now has an executable command in the backend.
 - Records runtime connection recommendation (pooled for app runtime, direct for admin tasks).
 
 If any check fails, do not continue to Phase 4 import until the report issues are resolved.
+
+## Implemented: Phase 4 Import and Validation
+
+Phase 4 now has an executable command in the backend.
+
+### 1) Ensure prerequisites are available
+
+- Phase 2 artifacts exist in `server/preflight-artifacts/`.
+- Phase 3 completed successfully.
+- Neon admin URL is configured (`NEON_DIRECT_DATABASE_URL`, or pooled fallback).
+
+Optional overrides:
+
+- `PHASE4_DUMP_PATH`
+- `PHASE4_BASELINE_PATH`
+- `PHASE4_API_BASE_URL`
+- `PHASE4_SKIP_API_SMOKE`
+
+### 2) Run Phase 4 command
+
+- `cd server && npm run preflight:phase4`
+
+### 3) Review generated artifact
+
+- `server/preflight-artifacts/phase4-import-validation-report-<timestamp>.json`
+
+### What this command validates and performs
+
+- Locates the latest Phase 2 dump and baseline artifacts (or uses provided override paths).
+- Truncates `workoutlist` and `cardiolist` on Neon before import to avoid duplicate rows.
+- Restores Render data into Neon using `pg_restore` with ownership/privilege-safe flags.
+- Compares Neon values to Render baseline:
+	- row counts
+	- min/max `created_at` values
+- Runs API smoke checks against configured API base URL:
+	- `GET /health`
+	- `GET /workoutlist`
+	- `GET /cardiolist`
+	- create/update/delete on both `workoutlist` and `cardiolist`
+
+If any check fails, do not continue to Phase 5 until the report issues are resolved.
+
+## Implemented: Phase 5 Cutover and Stabilization
+
+Phase 5 now has an executable command in the backend.
+
+Optional controls:
+
+- `PHASE5_API_BASE_URL`
+- `PHASE5_APPLY_LOCAL_DATABASE_URL_SWITCH`
+- `PHASE5_SKIP_HEALTH_CHECK`
+
+### 1) Run Phase 5 command
+
+- `cd server && npm run preflight:phase5`
+
+### 2) Review generated artifacts
+
+- `server/preflight-artifacts/phase5-cutover-report-<timestamp>.json`
+- `server/preflight-artifacts/phase5-cutover-env-snapshot-<timestamp>.env`
+
+### What this command validates and prepares
+
+- Creates a cutover env snapshot artifact for rollback safety.
+- Optionally updates local `server/.env` `DATABASE_URL` to Neon pooled URL (when `PHASE5_APPLY_LOCAL_DATABASE_URL_SWITCH=true`).
+- Probes connectivity for Neon pooled/direct URLs and Render rollback URL.
+- Runs API health check on configured base URL.
+- Produces a manual cutover checklist for production env update, redeploy, mobile verification, and stabilization monitoring.
+
+Notes:
+
+- This command does not modify deployment platform env vars.
+- This command does not redeploy the backend automatically.
+- Production cutover and restart are intentionally manual and confirmed through checklist/report output.

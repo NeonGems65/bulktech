@@ -11,6 +11,8 @@
     "preflight:phase1": "node scripts/phase1-preflight.js",
     "preflight:phase2": "node scripts/phase2-source-backup.js",
     "preflight:phase3": "node scripts/phase3-neon-prep.js",
+    "preflight:phase4": "node scripts/phase4-import-validate.js",
+    "preflight:phase5": "node scripts/phase5-cutover-stabilize.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
