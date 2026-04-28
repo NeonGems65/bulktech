@@ -217,12 +217,12 @@ const InputWorkout = () => {
         };
     }
 
-    const onAddDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+    const onAddDateChange = (event: DateTimePickerEvent, date?: Date) => {
         if (Platform.OS === 'android') {
             setShowAddDatePicker(false);
         }
 
-        if (date) {
+        if (event.type === 'set' && date) {
             setSelectedDateTime((prevDateTime) => {
                 const nextDateTime = new Date(prevDateTime);
                 nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
@@ -231,12 +231,12 @@ const InputWorkout = () => {
         }
     };
 
-    const onAddTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+    const onAddTimeChange = (event: DateTimePickerEvent, date?: Date) => {
         if (Platform.OS === 'android') {
             setShowAddTimePicker(false);
         }
 
-        if (date) {
+        if (event.type === 'set' && date) {
             setSelectedDateTime((prevDateTime) => {
                 const nextDateTime = new Date(prevDateTime);
                 nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
@@ -245,12 +245,12 @@ const InputWorkout = () => {
         }
     };
 
-    const onEditDateChange = (_event: DateTimePickerEvent, date?: Date) => {
+    const onEditDateChange = (event: DateTimePickerEvent, date?: Date) => {
         if (Platform.OS === 'android') {
             setShowEditDatePicker(false);
         }
 
-        if (date) {
+        if (event.type === 'set' && date) {
             setEditDateTime((prevDateTime) => {
                 const nextDateTime = new Date(prevDateTime);
                 nextDateTime.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
@@ -259,12 +259,12 @@ const InputWorkout = () => {
         }
     };
 
-    const onEditTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
+    const onEditTimeChange = (event: DateTimePickerEvent, date?: Date) => {
         if (Platform.OS === 'android') {
             setShowEditTimePicker(false);
         }
 
-        if (date) {
+        if (event.type === 'set' && date) {
             setEditDateTime((prevDateTime) => {
                 const nextDateTime = new Date(prevDateTime);
                 nextDateTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
